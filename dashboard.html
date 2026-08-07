@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard | Valley Christian Schools Peer Tutoring</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .dash-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-light);
+    padding: 24px;
+  }
+  .dash-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 44px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+  }
+  .dash-card h1 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: 26px;
+    margin: 18px 0 6px;
+    color: var(--navy-dark);
+  }
+  .role-pill {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--navy);
+    background: var(--sky-soft);
+    border: 1px solid var(--sky);
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-top: 8px;
+  }
+  .dash-card p.lead {
+    margin: 18px 0 28px;
+  }
+  .coming-soon {
+    text-align: left;
+    background: var(--gray-light);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 24px;
+  }
+  .coming-soon h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #5b6670;
+    margin: 0 0 10px;
+  }
+  .coming-soon ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 14px;
+    color: #4a545c;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+<div class="dash-wrap">
+  <div class="dash-card">
+    <img src="assets/vcs-lockup-navy.png" alt="Valley Christian Schools" style="height:36px; margin: 0 auto 6px;" />
+    <h1 id="welcome-heading">Welcome!</h1>
+    <span class="role-pill" id="role-pill"></span>
+    <p class="lead" id="welcome-copy">You're logged in.</p>
+
+    <div class="coming-soon">
+      <h2>Coming up next</h2>
+      <ul>
+        <li>Get matched with a tutor or tutee</li>
+        <li>Chat and video call right here</li>
+        <li>Send files back and forth</li>
+      </ul>
+    </div>
+
+    <button class="btn-primary" id="logout-btn" style="width:100%;">Log Out</button>
+  </div>
+</div>
+
+<script>
+  const SESSION_KEY = "wc_session";
+  const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
+
+  if (!raw) {
+    window.location.href = "login.html";
+  } else {
+    const session = JSON.parse(raw);
+    document.getElementById("welcome-heading").textContent = `Welcome, ${session.name.split(" ")[0]}`;
+    document.getElementById("welcome-copy").textContent =
+      session.role === "tutor"
+        ? "You're signed in as a tutor. We'll let you know as soon as you're matched with a tutee."
+        : "You're signed in as a tutee. We'll let you know as soon as you're matched with a tutor.";
+    document.getElementById("role-pill").textContent = session.role;
+  }
+
+  document.getElementById("logout-btn").addEventListener("click", () => {
+    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
+    window.location.href = "index.html";
+  });
+</script>
+</body>
+</html>

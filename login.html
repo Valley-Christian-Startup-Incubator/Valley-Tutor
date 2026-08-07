@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Log In | Valley Christian Schools Peer Tutoring</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="page">
+
+  <!-- Brand panel -->
+  <section class="brand-panel">
+    <div>
+      <div class="brand-logo on-dark large">
+        <img src="assets/vcs-lockup-white.png" alt="Valley Christian Schools" />
+        <span class="program-tag">Peer<br />Tutoring</span>
+      </div>
+
+      <div class="brand-copy">
+        <h1>Every Warrior has something to teach&mdash;and something to learn.</h1>
+        <p>Sign up as a tutor or tutee, get matched, and take it from there: chat, video call, and share files, all in one place.</p>
+      </div>
+
+      <ol class="brand-steps">
+        <li><span class="step-num">1</span> Create your account as a tutor or tutee</li>
+        <li><span class="step-num">2</span> Get matched based on subject and availability</li>
+        <li><span class="step-num">3</span> Message, meet, and share files right here</li>
+      </ol>
+    </div>
+
+    <p class="brand-verse">&ldquo;Do it heartily as to the Lord.&rdquo; &mdash; Col. 3:23</p>
+  </section>
+
+  <!-- Form panel -->
+  <section class="form-panel">
+    <div class="auth-card">
+
+      <a href="index.html" class="back-home">&larr; Back to home</a>
+
+      <div class="tabs" role="tablist" aria-label="Login or sign up">
+        <button class="tab-btn active" id="tab-login" role="tab" aria-selected="true" aria-controls="form-login">Log In</button>
+        <button class="tab-btn" id="tab-signup" role="tab" aria-selected="false" aria-controls="form-signup">Sign Up</button>
+      </div>
+
+      <div class="alert alert-error" id="alert-error" role="alert"></div>
+      <div class="alert alert-success" id="alert-success" role="status"></div>
+
+      <!-- LOG IN -->
+      <form class="auth-form active" id="form-login" novalidate>
+        <h2>Welcome back</h2>
+        <p class="lead">Log in to reach your tutor or tutee.</p>
+
+        <div class="field" id="field-login-email">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" autocomplete="email" placeholder="you@vcs.net" />
+          <div class="field-error"></div>
+        </div>
+
+        <div class="field" id="field-login-password">
+          <label for="login-password">Password</label>
+          <div class="password-row">
+            <input type="password" id="login-password" autocomplete="current-password" placeholder="Enter your password" />
+            <button type="button" class="toggle-visibility" data-target="login-password" aria-label="Show password">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="field-error"></div>
+        </div>
+
+        <div class="row-between">
+          <label class="checkbox-row">
+            <input type="checkbox" id="login-remember" />
+            Remember me
+          </label>
+          <button type="button" class="link-btn" id="forgot-password">Forgot password?</button>
+        </div>
+
+        <button type="submit" class="btn-primary" id="login-submit">Log In</button>
+      </form>
+
+      <!-- SIGN UP -->
+      <form class="auth-form" id="form-signup" novalidate>
+        <h2>Join Peer Tutoring</h2>
+        <p class="lead">Tell us a bit about yourself to get started.</p>
+
+        <div class="field">
+          <label>I want to sign up as a&hellip;</label>
+          <div class="role-select">
+            <label class="role-option">
+              <input type="radio" name="role" value="tutor" id="role-tutor" checked />
+              <span class="role-card">
+                <svg class="role-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 1 9l11 6 9-4.9V17"/><path d="M5 10.8V16c0 1.5 3 3 7 3s7-1.5 7-3v-5.2"/></svg>
+                <span class="role-title">Tutor</span>
+                <span class="role-desc">I want to help other students learn</span>
+              </span>
+            </label>
+            <label class="role-option">
+              <input type="radio" name="role" value="tutee" id="role-tutee" />
+              <span class="role-card">
+                <svg class="role-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <span class="role-title">Tutee</span>
+                <span class="role-desc">I'm looking for help from a tutor</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field" id="field-signup-name">
+          <label for="signup-name">Full name</label>
+          <input type="text" id="signup-name" autocomplete="name" placeholder="Jordan Smith" />
+          <div class="field-error"></div>
+        </div>
+
+        <div class="field" id="field-signup-email">
+          <label for="signup-email">School email</label>
+          <input type="email" id="signup-email" autocomplete="email" placeholder="you@vcs.net" />
+          <div class="field-hint">Use your Valley Christian school email.</div>
+          <div class="field-error"></div>
+        </div>
+
+        <div class="field" id="field-signup-password">
+          <label for="signup-password">Password</label>
+          <div class="password-row">
+            <input type="password" id="signup-password" autocomplete="new-password" placeholder="At least 8 characters" />
+            <button type="button" class="toggle-visibility" data-target="signup-password" aria-label="Show password">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="field-error"></div>
+        </div>
+
+        <div class="field" id="field-signup-confirm">
+          <label for="signup-confirm">Confirm password</label>
+          <div class="password-row">
+            <input type="password" id="signup-confirm" autocomplete="new-password" placeholder="Re-enter your password" />
+            <button type="button" class="toggle-visibility" data-target="signup-confirm" aria-label="Show password">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="field-error"></div>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="signup-terms" />
+          I agree to be matched and contacted through Peer Tutoring
+        </label>
+
+        <button type="submit" class="btn-primary" id="signup-submit">Create Account</button>
+      </form>
+
+      <p class="switch-note" id="switch-login-note">
+        New here? <button type="button" id="go-to-signup">Create an account</button>
+      </p>
+      <p class="switch-note" id="switch-signup-note" style="display:none;">
+        Already have an account? <button type="button" id="go-to-login">Log in</button>
+      </p>
+
+      <p class="footer-note">This is a local prototype &mdash; accounts are stored on this device only.</p>
+    </div>
+  </section>
+
+</div>
+
+<script src="auth.js"></script>
+</body>
+</html>
