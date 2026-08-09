@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Peer Tutoring | Valley Christian Schools</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="app.css" />
+</head>
+<body class="app-body">
+
+<header class="app-topbar">
+  <a href="index.html" class="app-logo-link">
+    <img src="assets/vcs-lockup-navy.png" alt="Valley Christian Schools" class="app-logo" />
+  </a>
+  <div class="app-topbar-user">
+    <span class="app-user-name" id="me-name"></span>
+    <button class="profile-icon-btn" id="profile-icon-btn" aria-label="Your profile">
+      <img id="header-avatar-img" class="profile-icon-img" style="display:none;" alt="" />
+      <span id="header-avatar-initials" class="profile-icon-initials"></span>
+    </button>
+  </div>
+</header>
+
+<nav class="app-tabs" role="tablist">
+  <button class="app-tab active" id="tab-matching" role="tab" aria-selected="true">Matching</button>
+  <button class="app-tab" id="tab-chats" role="tab" aria-selected="false">Chats</button>
+  <button class="app-tab" id="tab-schedule" role="tab" aria-selected="false" style="display:none;">Schedule</button>
+</nav>
+
+<main class="app-main">
+
+  <!-- PROFILE TAB (opened via the header icon, not a nav tab) -->
+  <section class="app-panel" id="panel-profile">
+    <div class="profile-shell">
+      <h1 id="profile-heading">Your Profile</h1>
+      <p class="profile-lead" id="profile-lead">Tell tutors what you need help with so we can point them your way.</p>
+
+      <div class="alert alert-success" id="profile-alert" role="status"></div>
+
+      <form id="profile-form">
+        <div class="profile-field">
+          <label>Profile Photo</label>
+          <div class="avatar-upload">
+            <div class="avatar-preview" id="avatar-preview">
+              <img id="avatar-preview-img" style="display:none;" alt="" />
+              <span id="avatar-preview-initials"></span>
+            </div>
+            <div class="avatar-upload-actions">
+              <button type="button" class="btn-ghost" id="avatar-upload-btn">Upload Photo</button>
+              <button type="button" class="link-btn" id="avatar-remove-btn" style="display:none;">Remove</button>
+            </div>
+            <input type="file" id="avatar-input" accept="image/*" hidden />
+          </div>
+        </div>
+
+        <div class="profile-field">
+          <label for="bio-input">Bio</label>
+          <textarea id="bio-input" rows="4" maxlength="400" placeholder="Tell people a bit about yourself…"></textarea>
+        </div>
+
+        <div class="profile-field" id="class-year-field">
+          <label>Your Class</label>
+          <div class="chip-grid" id="class-year-grid"></div>
+        </div>
+
+        <div class="profile-field" id="taken-courses-field">
+          <label>Classes You've Taken</label>
+          <div class="course-tags" id="taken-courses-tags"></div>
+          <button type="button" class="btn-ghost" id="taken-courses-add-btn">+ Add a Class</button>
+        </div>
+
+        <div class="profile-field" id="subjects-field">
+          <label id="subjects-label">Subjects</label>
+          <div class="course-tags" id="subjects-tags"></div>
+          <button type="button" class="btn-ghost" id="subjects-add-btn" style="display:none;">+ Add a Class</button>
+        </div>
+
+        <div class="profile-field" id="grade-level-field">
+          <label id="grade-label">Grade Level</label>
+          <div class="chip-grid" id="grade-grid"></div>
+        </div>
+
+        <div class="profile-field">
+          <label>Availability</label>
+          <div class="availability-grid" id="availability-grid"></div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="max-width:220px;">Save Profile</button>
+      </form>
+
+      <div class="profile-footer">
+        <button class="btn-ghost app-logout" id="logout-btn">Log Out</button>
+        <span class="role-pill" id="me-role-pill"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- MATCHING TAB -->
+  <section class="app-panel" id="panel-matching">
+    <div class="matching-shell">
+      <h1 id="matching-heading">Find a Match</h1>
+      <p class="profile-lead" id="matching-lead">Browse students based on shared subjects, then start a chat.</p>
+      <div id="matching-list" class="matching-list"></div>
+    </div>
+  </section>
+
+  <!-- CHATS TAB -->
+  <section class="app-panel" id="panel-chats">
+    <div class="chats-shell">
+
+      <aside class="chat-list-col">
+        <div class="chat-list-head">
+          <h2>Chats</h2>
+        </div>
+        <div id="chat-list" class="chat-list"></div>
+      </aside>
+
+      <section class="chat-thread-col">
+        <div id="chat-empty" class="chat-empty">
+          <p>Select a chat to get going, or visit the Matching tab to start one.</p>
+        </div>
+        <div id="chat-active" class="chat-active" style="display:none;">
+          <div class="chat-thread-head">
+            <div>
+              <h2 id="chat-partner-name"></h2>
+              <span class="chat-subject" id="chat-subject"></span>
+            </div>
+            <button class="btn-ghost" id="schedule-btn" style="display:none;">Schedule Session</button>
+          </div>
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-attach-preview" id="chat-attach-preview" style="display:none;"></div>
+          <form class="chat-composer" id="chat-composer">
+            <button type="button" class="composer-attach" id="attach-btn" aria-label="Attach a file">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.4 11.6 12.6 20.4a4.5 4.5 0 0 1-6.4-6.4l9-8.9a3 3 0 0 1 4.2 4.2L10.5 18a1.5 1.5 0 0 1-2.1-2.1l7.8-7.8"/></svg>
+            </button>
+            <input type="file" id="file-input" hidden />
+            <input type="text" id="message-input" placeholder="Type a message…" autocomplete="off" />
+            <button type="submit" class="btn-primary composer-send">Send</button>
+          </form>
+        </div>
+      </section>
+
+      <aside class="sessions-col">
+        <h2>Upcoming Sessions</h2>
+        <div id="sessions-list" class="sessions-list"></div>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- SCHEDULE TAB (tutors only) -->
+  <section class="app-panel" id="panel-schedule">
+    <div class="schedule-shell">
+      <h1>Schedule a Session</h1>
+      <p class="profile-lead">Pick a tutee you're matched with, then choose a time. Add a Zoom link as a backup in case the embedded video call can't connect.</p>
+
+      <form id="schedule-tab-form">
+        <div class="profile-field">
+          <label for="schedule-tutee-select">Tutee</label>
+          <select id="schedule-tutee-select"></select>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="schedule-tab-date">Date</label>
+            <input type="date" id="schedule-tab-date" required />
+          </div>
+          <div class="field">
+            <label for="schedule-tab-time">Time</label>
+            <input type="time" id="schedule-tab-time" required />
+          </div>
+          <div class="field">
+            <label for="schedule-tab-duration">Duration</label>
+            <select id="schedule-tab-duration">
+              <option value="30">30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="schedule-tab-zoom">Zoom link (optional fallback)</label>
+          <input type="url" id="schedule-tab-zoom" placeholder="https://zoom.us/j/..." />
+        </div>
+
+        <div class="field-error" id="schedule-tab-error"></div>
+        <button type="submit" class="btn-primary" style="max-width:220px;">Schedule Session</button>
+      </form>
+
+      <div class="schedule-upcoming">
+        <h2>Sessions You've Scheduled</h2>
+        <div id="schedule-upcoming-list" class="sessions-list"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Course picker modal: category -> course -> level. Reused for both the
+     tutor's "classes you've taken" and the "classes you need help with"
+     picker (tutees, and tutors adding subjects outside their taken classes
+     isn't allowed — see app.js). -->
+<div class="modal-overlay" id="course-picker-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="course-picker-title">Add a Class</h3>
+      <button class="modal-close" id="course-picker-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="course-picker-categories" class="course-picker-categories"></div>
+      <div id="course-picker-courses" class="course-picker-courses" style="display:none;">
+        <button type="button" class="link-btn course-picker-back" id="course-picker-back">&larr; Categories</button>
+        <div id="course-picker-course-list" class="course-picker-course-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

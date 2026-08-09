@@ -4,13 +4,18 @@ A peer tutoring web app prototype for Valley Christian Schools. Students sign up
 
 ## Status
 
-Front-end prototype: landing page, login/signup, and a placeholder post-login dashboard. Accounts are stored in the browser's `localStorage` with SHA-256-hashed passwords — there's no real backend yet.
+Front-end prototype: landing page, login/signup, and a post-login app with profile, matching, chat (with file sharing), session scheduling, and video calls. Accounts, profiles, chats, and sessions are stored in the browser's `localStorage` with SHA-256-hashed passwords — there's no real backend yet.
 
 ## Pages
 
 - `index.html` — marketing landing page
 - `login.html` — log in / sign up (supports `?tab=signup` to open directly on the sign-up tab)
-- `dashboard.html` — placeholder landing spot after login
+- `app.html` — the main app, with four tabs:
+  - **Profile** — subjects, grade level, and availability
+  - **Matching** — browse tutors/tutees by shared subject and start a chat
+  - **Chats** — message threads with file sharing, plus an "Upcoming Sessions" sidebar (countdowns, a "Join Video Call" button once a session's time has come, and an "Open Zoom Instead" fallback link when the tutor set one)
+  - **Schedule** (tutors only) — schedule a new session with a matched tutee, with an optional Zoom link as a fallback
+- `video.html` — the embedded video call (WebRTC via `RTCPeerConnection`, signaled over `BroadcastChannel` for same-browser demo purposes). If the camera/mic can't be accessed, or the call can't connect within 25s, it offers the session's Zoom link as a fallback instead.
 
 ## Running locally
 
@@ -31,7 +36,5 @@ This is a student-built prototype, not an official VCS system.
 ## Roadmap
 
 - Real backend + database for accounts (swap out the `localStorage` mock)
-- Tutor/tutee matching
-- In-app chat
-- Video calls
-- File sharing
+- Real signaling server for video calls (the current `BroadcastChannel` approach only works between tabs on the same device/browser)
+- Real Zoom API integration for auto-generated meeting links, instead of tutors pasting their own

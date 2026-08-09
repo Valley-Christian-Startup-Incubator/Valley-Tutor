@@ -1,6 +1,3 @@
-const USERS_KEY = "wc_users";
-const SESSION_KEY = "wc_session";
-
 const tabLogin = document.getElementById("tab-login");
 const tabSignup = document.getElementById("tab-signup");
 const formLogin = document.getElementById("form-login");
@@ -73,27 +70,6 @@ function clearFieldErrors(ids) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function getUsers() {
-  return JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-async function hashPassword(password) {
-  const data = new TextEncoder().encode(password);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function startSession(user, remember) {
-  const store = remember ? localStorage : sessionStorage;
-  store.setItem(SESSION_KEY, JSON.stringify({ name: user.name, email: user.email, role: user.role }));
-}
-
 formLogin.addEventListener("submit", async (e) => {
   e.preventDefault();
   clearAlerts();
@@ -101,7 +77,6 @@ formLogin.addEventListener("submit", async (e) => {
 
   const email = document.getElementById("login-email").value.trim().toLowerCase();
   const password = document.getElementById("login-password").value;
-  const remember = document.getElementById("login-remember").checked;
 
   let valid = true;
   if (!EMAIL_RE.test(email)) {
@@ -127,10 +102,10 @@ formLogin.addEventListener("submit", async (e) => {
     return;
   }
 
-  startSession(user, remember);
+  startSession(user);
   showSuccess(`Welcome back, ${user.name.split(" ")[0]}! Taking you to your dashboard…`);
   setTimeout(() => {
-    window.location.href = "dashboard.html";
+    window.location.href = "app.html";
   }, 700);
 });
 
@@ -164,7 +139,7 @@ formSignup.addEventListener("submit", async (e) => {
     valid = false;
   }
   if (!agreed) {
-    showError("Please agree to be matched and contacted through Warrior Connect.");
+    showError("Please agree to be matched and contacted through Peer Tutoring.");
     valid = false;
   }
   if (!valid) return;
@@ -190,18 +165,17 @@ formSignup.addEventListener("submit", async (e) => {
   };
   users.push(newUser);
   saveUsers(users);
-  startSession(newUser, true);
+  startSession(newUser);
 
-  showSuccess(`Account created! Welcome to Warrior Connect, ${name.split(" ")[0]}.`);
+  showSuccess(`Account created! Welcome to Peer Tutoring, ${name.split(" ")[0]}.`);
   setTimeout(() => {
-    window.location.href = "dashboard.html";
+    window.location.href = "app.html";
   }, 700);
 });
 
 (function redirectIfLoggedIn() {
-  const existing = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
-  if (existing) {
-    window.location.href = "dashboard.html";
+  if (getSession()) {
+    window.location.href = "app.html";
   }
 })();
 
