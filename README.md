@@ -12,34 +12,52 @@ The path a student takes, from landing page to a live tutoring session. Role is 
 
 ```mermaid
 graph TD
-    landing["Landing page"] --> choose{"Sign up<br/>or log in?"}
+    landing["Landing page"] --> choose{"`Sign up
+    or log in?`"}
     choose -->|"Sign up"| role{"Tutor or tutee?"}
     choose -->|"Log in"| home
 
-    role -->|"Tutor"| ptutor["<b>Profile</b><br/>photo, bio, class year,<br/>classes you can teach,<br/>grade levels you'll tutor,<br/>availability"]
-    role -->|"Tutee"| ptutee["<b>Profile</b><br/>photo, bio, grade level,<br/>classes you need help with,<br/>availability"]
+    role -->|"Tutor"| ptutor["`**Profile**
+    photo, bio, class year,
+    classes you can teach,
+    grade levels you'll tutor,
+    availability`"]
+    role -->|"Tutee"| ptutee["`**Profile**
+    photo, bio, grade level,
+    classes you need help with,
+    availability`"]
 
     ptutor --> home
     ptutee --> home
 
-    home["<b>Matching</b><br/>browse the opposite role,<br/>shared classes highlighted"]
-    home -->|"Start Chat"| chat["<b>Chat</b><br/>messages, file and image sharing,<br/>upcoming sessions in the sidebar"]
+    home["`**Matching**
+    browse the opposite role,
+    shared classes highlighted`"]
+    home -->|"Start Chat"| chat["`**Chat**
+    messages, file and image sharing,
+    upcoming sessions in the sidebar`"]
 
     chat --> whoami{"Am I the tutor?"}
-    whoami -->|"Tutor"| sched["<b>Schedule</b><br/>pick a matched tutee, date, time,<br/>duration, optional Zoom link"]
-    whoami -->|"Tutee"| wait["See the session appear<br/>with a live countdown"]
+    whoami -->|"Tutor"| sched["`**Schedule**
+    pick a matched tutee, date, time,
+    duration, optional Zoom link`"]
+    whoami -->|"Tutee"| wait["`See the session appear
+    with a live countdown`"]
 
-    sched --> booked["Session booked —<br/>visible to both people"]
+    sched --> booked["`Session booked —
+    visible to both people`"]
     wait --> booked
 
-    booked --> due{"Start time<br/>reached?"}
+    booked --> due{"`Start time
+    reached?`"}
     due -->|"Not yet"| wait
     due -->|"Join Video Call"| incall["In-app video call"]
     incall -.->|"no camera or mic"| zoom
     incall -.->|"can't connect in 25s"| zoom
     booked -.->|"Open Zoom Instead"| zoom
 
-    zoom["Zoom fallback<br/><i>only if the tutor set a link</i>"]
+    zoom["`Zoom fallback
+    *only if the tutor set a link*`"]
 ```
 
 The diagram shows one pass through, but nothing is one-shot: a student can keep any number of chats going at once, and a single chat can carry session after session. The Zoom link is never the default path — it's an escape hatch for when the in-app call can't happen, and only exists if the tutor pasted one in while scheduling.
