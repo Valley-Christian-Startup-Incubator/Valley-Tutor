@@ -38,9 +38,9 @@ graph TD
     due -->|"Not yet"| wait
     due -->|"Yes"| join["<b>Join Video Call</b>"]
 
-    join --> call["In-app video call"]
-    call -.->|"no camera or mic"| zoom
-    call -.->|"can't connect in 25s"| zoom
+    join --> incall["In-app video call"]
+    incall -.->|"no camera or mic"| zoom
+    incall -.->|"can't connect in 25s"| zoom
     booked -.->|"Open Zoom Instead"| zoom
 
     zoom["Zoom fallback<br/><i>only if the tutor set a link</i>"]
