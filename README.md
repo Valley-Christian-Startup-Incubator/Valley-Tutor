@@ -6,70 +6,47 @@ A peer tutoring web app prototype for Valley Christian Schools. Students sign up
 
 Front-end prototype: landing page, login/signup, and a post-login app with profile, matching, chat (with file sharing), session scheduling, and video calls. Accounts, profiles, chats, and sessions are stored in the browser's `localStorage` with SHA-256-hashed passwords — there's no real backend yet.
 
-## Architecture
+## How it works
 
-Everything runs in the browser. Pages are plain HTML with a stack of `<script>` tags — no bundler, no modules, no server beyond a static file host. `core.js` and `data.js` are the shared layer; each page adds its own controller on top.
+The path a student takes, from landing page to a live tutoring session. Role is chosen at sign-up and shapes everything after it — tutors and tutees see different profile prompts, get matched against each other, and only tutors can schedule.
 
 ```mermaid
 graph TD
-    subgraph pages["Pages"]
-        index["index.html<br/><i>landing</i>"]
-        login["login.html"]
-        app["app.html<br/><i>profile · matching · chats · schedule</i>"]
-        video["video.html"]
-    end
+    landing["Landing page"] --> choose{"Sign up<br/>or log in?"}
+    choose -->|"Sign up"| role{"Tutor or tutee?"}
+    choose -->|"Log in"| home
 
-    subgraph controllers["Page controllers"]
-        authjs["auth.js<br/><i>signup, login, validation</i>"]
-        appjs["app.js<br/><i>tab rendering, chat, scheduling</i>"]
-        videojs["video.js<br/><i>WebRTC peer connection</i>"]
-    end
+    role -->|"Tutor"| ptutor["<b>Profile</b><br/>photo, bio, class year,<br/>classes you can teach,<br/>grade levels you'll tutor,<br/>availability"]
+    role -->|"Tutee"| ptutee["<b>Profile</b><br/>photo, bio, grade level,<br/>classes you need help with,<br/>availability"]
 
-    subgraph shared["Shared layer"]
-        core["core.js<br/><i>users, password hashing, session</i>"]
-        data["data.js<br/><i>profiles, chats, messages, sessions,<br/>course catalog + prereq graph</i>"]
-    end
+    ptutor --> home
+    ptutee --> home
 
-    subgraph browser["Browser APIs"]
-        ls[("localStorage<br/><i>users, profiles, chats,<br/>messages, sessions</i>")]
-        ss[("sessionStorage<br/><i>logged-in user, per tab</i>")]
-        crypto["crypto.subtle<br/><i>SHA-256</i>"]
-        bc_updates["BroadcastChannel<br/><b>wc_updates</b><br/><i>cross-tab refresh</i>"]
-        bc_call["BroadcastChannel<br/><b>wc_call_&lt;id&gt;</b><br/><i>SDP + ICE signaling</i>"]
-        media["getUserMedia +<br/>RTCPeerConnection"]
-    end
+    home["<b>Matching</b><br/>browse the opposite role,<br/>shared classes highlighted"]
+    home --> startchat["Start Chat"]
 
-    zoom["Zoom link<br/><i>manual fallback</i>"]
+    startchat --> chat["<b>Chat</b><br/>messages, file and image sharing,<br/>upcoming sessions in the sidebar"]
 
-    index --> login
-    login --> authjs
-    app --> appjs
-    video --> videojs
+    chat --> whoami{"Am I the tutor?"}
+    whoami -->|"Tutor"| sched["<b>Schedule</b><br/>pick a matched tutee, date, time,<br/>duration, optional Zoom link"]
+    whoami -->|"Tutee"| wait["See the session appear<br/>with a live countdown"]
 
-    authjs --> core
-    appjs --> core
-    appjs --> data
-    videojs --> core
-    videojs --> data
+    sched --> booked["Session booked —<br/>visible to both people"]
+    wait --> booked
 
-    core --> ls
-    core --> ss
-    core --> crypto
-    data --> ls
-    data --> bc_updates
-    bc_updates -.->|"re-render"| appjs
+    booked --> due{"Start time<br/>reached?"}
+    due -->|"Not yet"| wait
+    due -->|"Yes"| join["<b>Join Video Call</b>"]
 
-    appjs -->|"session start time reached"| video
-    videojs --> media
-    videojs --> bc_call
-    bc_call -.->|"offer / answer / candidates"| videojs
-    videojs -.->|"no camera, or 25s timeout"| zoom
-    appjs -.->|"Open Zoom Instead"| zoom
+    join --> call["In-app video call"]
+    call -.->|"no camera or mic"| zoom
+    call -.->|"can't connect in 25s"| zoom
+    booked -.->|"Open Zoom Instead"| zoom
 
-    authjs -->|"on success"| app
+    zoom["Zoom fallback<br/><i>only if the tutor set a link</i>"]
 ```
 
-Two things to note. There is no request/response cycle anywhere — every "write" is a `localStorage` mutation, and other tabs learn about it through the `wc_updates` channel or the native `storage` event. And the video call signals over a `BroadcastChannel`, which only reaches tabs in the *same browser* — enough to demo a tutor and tutee side by side, but it is not a real signaling server.
+The diagram shows one pass through, but nothing is one-shot: a student can keep any number of chats going at once, and a single chat can carry session after session. The Zoom link is never the default path — it's an escape hatch for when the in-app call can't happen, and only exists if the tutor pasted one in while scheduling.
 
 ## Pages
 
