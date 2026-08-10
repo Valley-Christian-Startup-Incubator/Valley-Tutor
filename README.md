@@ -23,9 +23,7 @@ graph TD
     ptutee --> home
 
     home["<b>Matching</b><br/>browse the opposite role,<br/>shared classes highlighted"]
-    home --> startchat["Start Chat"]
-
-    startchat --> chat["<b>Chat</b><br/>messages, file and image sharing,<br/>upcoming sessions in the sidebar"]
+    home -->|"Start Chat"| chat["<b>Chat</b><br/>messages, file and image sharing,<br/>upcoming sessions in the sidebar"]
 
     chat --> whoami{"Am I the tutor?"}
     whoami -->|"Tutor"| sched["<b>Schedule</b><br/>pick a matched tutee, date, time,<br/>duration, optional Zoom link"]
@@ -36,9 +34,7 @@ graph TD
 
     booked --> due{"Start time<br/>reached?"}
     due -->|"Not yet"| wait
-    due -->|"Yes"| join["<b>Join Video Call</b>"]
-
-    join --> incall["In-app video call"]
+    due -->|"Join Video Call"| incall["In-app video call"]
     incall -.->|"no camera or mic"| zoom
     incall -.->|"can't connect in 25s"| zoom
     booked -.->|"Open Zoom Instead"| zoom
