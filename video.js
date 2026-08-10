@@ -24,6 +24,22 @@ async function init() {
   const localVideo = document.getElementById("local-video");
   const remoteVideo = document.getElementById("remote-video");
 
+  // Clicking the small picture-in-picture window swaps it with the main view.
+  let mainIsLocal = false;
+  function updateVideoLayout() {
+    localVideo.classList.toggle("video-slot-main", mainIsLocal);
+    localVideo.classList.toggle("video-slot-pip", !mainIsLocal);
+    remoteVideo.classList.toggle("video-slot-main", !mainIsLocal);
+    remoteVideo.classList.toggle("video-slot-pip", mainIsLocal);
+  }
+  [localVideo, remoteVideo].forEach((videoEl) => {
+    videoEl.addEventListener("click", () => {
+      if (!videoEl.classList.contains("video-slot-pip")) return;
+      mainIsLocal = !mainIsLocal;
+      updateVideoLayout();
+    });
+  });
+
   let localStream;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });

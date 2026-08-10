@@ -15,6 +15,10 @@ if (me) {
     window.location.href = "index.html";
   });
   document.getElementById("course-picker-close").addEventListener("click", () => toggleModal("course-picker-modal", false));
+  document.getElementById("lightbox-close").addEventListener("click", () => toggleModal("image-lightbox", false));
+  document.getElementById("image-lightbox").addEventListener("click", (e) => {
+    if (e.target.id === "image-lightbox") toggleModal("image-lightbox", false);
+  });
 
   initTabs();
   initProfileTab();
@@ -395,6 +399,11 @@ function openCoursePicker({ title, isSelected, onToggle }) {
   toggleModal("course-picker-modal", true);
 }
 
+function openLightbox(src) {
+  document.getElementById("lightbox-img").src = src;
+  toggleModal("image-lightbox", true);
+}
+
 // ---------------- Chats tab ----------------
 
 function initChatsTab() {
@@ -471,7 +480,7 @@ function renderMessages(chatId) {
       let attachmentHtml = "";
       if (m.attachment) {
         if (m.attachment.type && m.attachment.type.startsWith("image/")) {
-          attachmentHtml = `<a href="${m.attachment.dataUrl}" download="${escapeHtml(m.attachment.name)}"><img class="msg-image" src="${m.attachment.dataUrl}" alt="${escapeHtml(m.attachment.name)}" /></a>`;
+          attachmentHtml = `<img class="msg-image" src="${m.attachment.dataUrl}" alt="${escapeHtml(m.attachment.name)}" />`;
         } else {
           attachmentHtml = `
             <a class="msg-file" href="${m.attachment.dataUrl}" download="${escapeHtml(m.attachment.name)}">
@@ -490,6 +499,10 @@ function renderMessages(chatId) {
         </div>`;
     })
     .join("");
+
+  container.querySelectorAll(".msg-image").forEach((img) => {
+    img.addEventListener("click", () => openLightbox(img.src));
+  });
 
   container.scrollTop = container.scrollHeight;
 }
