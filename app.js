@@ -1,5 +1,6 @@
 const PANEL_NAMES = ["profile", "matching", "chats", "schedule"];
 const NAV_TAB_NAMES = ["matching", "chats", "schedule"];
+const PERSON_COLORS = ["#2b6cb0", "#9f7aea", "#38a169", "#dd6b20", "#d53f8c", "#319795", "#c05621", "#5a67d8"];
 let activeChatId = null;
 let pendingAttachment = null;
 
@@ -14,7 +15,6 @@ if (me) {
     clearSession();
     window.location.href = "index.html";
   });
-  document.getElementById("course-picker-close").addEventListener("click", () => toggleModal("course-picker-modal", false));
   document.getElementById("lightbox-close").addEventListener("click", () => toggleModal("image-lightbox", false));
   document.getElementById("image-lightbox").addEventListener("click", (e) => {
     if (e.target.id === "image-lightbox") toggleModal("image-lightbox", false);
@@ -112,16 +112,16 @@ function renderHeaderAvatar() {
 
 function initProfileTab() {
   const isTutor = me.role === "tutor";
-  document.getElementById("profile-heading").textContent = isTutor ? "Your Tutor Profile" : "Your Profile";
-  document.getElementById("profile-lead").textContent = isTutor
-    ? "Let tutees know what you can help with and when you're free."
-    : "Tell tutors what you need help with so we can point them your way.";
-  document.getElementById("subjects-label").textContent = isTutor ? "Classes You Can Teach" : "Classes You Need Help With";
-  document.getElementById("grade-label").textContent = isTutor
-    ? "Grade levels you can tutor"
-    : "Your grade level";
-
   const profile = getProfile(me.email);
+
+  document.getElementById("profile-name-heading").textContent = me.name;
+  document.getElementById("profile-subtitle").textContent = isTutor
+    ? profile.classYear || "Tutor"
+    : profile.gradeLevel ? `${profile.gradeLevel} Grade` : "Tutee";
+  document.getElementById("bio-hint").textContent = isTutor
+    ? "Two or three sentences. Say which teacher you had, if it's relevant."
+    : "Two or three sentences about what you're working on.";
+  document.getElementById("grade-label").textContent = isTutor ? "Grade Levels You'll Tutor" : "Your Grade Level";
 
   // Photo
   let pendingPhoto = profile.photo || "";
@@ -184,99 +184,19 @@ function initProfileTab() {
     classYearField.style.display = "none";
   }
 
-  // Classes You've Taken (tutor) drives eligibility silently — matching uses
-  // the full computed list, with no separate "Classes You Can Teach" picker.
-  // Tutees pick freely from the catalog for "Classes You Need Help With".
-  const takenCoursesField = document.getElementById("taken-courses-field");
-  const subjectsField = document.getElementById("subjects-field");
-  const subjectsAddBtn = document.getElementById("subjects-add-btn");
-  const subjectsTags = document.getElementById("subjects-tags");
-
-  let pendingTakenCourses = (profile.takenCourses || []).map((t) => ({ course: t.course, level: t.level }));
-  let pendingSubjects = new Set(profile.subjects || []);
-
+  // Grade levels: tutors multi-select which grades they'll tutor, tutees
+  // single-select their own grade.
+  const gradeGrid = document.getElementById("grade-grid");
   if (isTutor) {
-    takenCoursesField.style.display = "";
-    subjectsField.style.display = "none";
-
-    renderTakenCoursesTags();
-
-    document.getElementById("taken-courses-add-btn").addEventListener("click", () => {
-      openCoursePicker({
-        title: "Add a Class You've Taken",
-        isSelected: (course, level) => pendingTakenCourses.some((t) => t.course === course && t.level === level),
-        onToggle: (course, level) => {
-          const idx = pendingTakenCourses.findIndex((t) => t.course === course && t.level === level);
-          if (idx === -1) pendingTakenCourses.push({ course, level });
-          else pendingTakenCourses.splice(idx, 1);
-          renderTakenCoursesTags();
-        },
-      });
-    });
+    gradeGrid.innerHTML = GRADE_LEVELS.map(
+      (g) => `
+      <label class="chip">
+        <input type="checkbox" name="grade" value="${g}" ${(profile.gradeLevels || []).includes(g) ? "checked" : ""} />
+        <span>${g}</span>
+      </label>`
+    ).join("");
   } else {
-    takenCoursesField.style.display = "none";
-    subjectsAddBtn.style.display = "inline-block";
-    subjectsTags.style.display = "flex";
-
-    renderSubjectTags();
-
-    document.getElementById("subjects-add-btn").addEventListener("click", () => {
-      openCoursePicker({
-        title: "Add a Class You Need Help With",
-        isSelected: (course, level) => pendingSubjects.has(courseLabel(course, level)),
-        onToggle: (course, level) => {
-          const label = courseLabel(course, level);
-          if (pendingSubjects.has(label)) pendingSubjects.delete(label);
-          else pendingSubjects.add(label);
-          renderSubjectTags();
-        },
-      });
-    });
-  }
-
-  function renderTakenCoursesTags() {
-    const tagsEl = document.getElementById("taken-courses-tags");
-    tagsEl.innerHTML = pendingTakenCourses
-      .map(
-        (t) => `
-      <span class="course-tag">
-        ${escapeHtml(courseLabel(t.course, t.level))}
-        <button type="button" data-course="${escapeHtml(t.course)}" data-level="${t.level}" aria-label="Remove">&times;</button>
-      </span>`
-      )
-      .join("");
-    tagsEl.querySelectorAll("button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        pendingTakenCourses = pendingTakenCourses.filter((t) => !(t.course === btn.dataset.course && t.level === btn.dataset.level));
-        renderTakenCoursesTags();
-      });
-    });
-  }
-
-  function renderSubjectTags() {
-    subjectsTags.innerHTML = Array.from(pendingSubjects)
-      .map(
-        (label) => `
-      <span class="course-tag">
-        ${escapeHtml(label)}
-        <button type="button" data-label="${escapeHtml(label)}" aria-label="Remove">&times;</button>
-      </span>`
-      )
-      .join("");
-    subjectsTags.querySelectorAll("button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        pendingSubjects.delete(btn.dataset.label);
-        renderSubjectTags();
-      });
-    });
-  }
-
-  const gradeLevelField = document.getElementById("grade-level-field");
-  if (isTutor) {
-    gradeLevelField.style.display = "none";
-  } else {
-    gradeLevelField.style.display = "";
-    document.getElementById("grade-grid").innerHTML = GRADE_LEVELS.map(
+    gradeGrid.innerHTML = GRADE_LEVELS.map(
       (g) => `
       <label class="chip">
         <input type="radio" name="grade" value="${g}" ${profile.gradeLevel === g ? "checked" : ""} />
@@ -284,6 +204,179 @@ function initProfileTab() {
       </label>`
     ).join("");
   }
+
+  // ---- Inline course browser: search + category accordions ----
+  // Tutor: "Classes You've Taken" drives the qualified-to-teach dropdown.
+  // Tutee: "Classes You Need Help With" is a free pick, no eligibility gate.
+  let pendingTakenCourses = (profile.takenCourses || []).map((t) => ({ course: t.course, level: t.level }));
+  let pendingSubjects = new Set(profile.subjects || []);
+  let courseSearchQuery = "";
+  let qualifiedExpanded = false;
+
+  const expandedCategories = new Set();
+  Object.keys(COURSE_CATALOG).forEach((category) => {
+    const hasSelection = getCourseCategoryRows(category).some((r) => isCourseSelected(r.course, r.level));
+    if (hasSelection) expandedCategories.add(category);
+  });
+
+  document.getElementById("course-browser-heading").textContent = isTutor ? "Classes You've Taken" : "Classes You Need Help With";
+  document.getElementById("course-browser-lead").textContent = isTutor
+    ? "Pick every course you have finished. We work out what that qualifies you to teach — you never guess."
+    : "Pick every course you'd like a tutor's help with.";
+  document.getElementById("course-search-input").placeholder = `Search ${totalCatalogCourseCount()} courses — try "span" or "AP"`;
+
+  function isCourseSelected(course, level) {
+    return isTutor
+      ? pendingTakenCourses.some((t) => t.course === course && t.level === level)
+      : pendingSubjects.has(courseLabel(course, level));
+  }
+
+  function toggleCourseSelection(course, level) {
+    if (isTutor) {
+      const idx = pendingTakenCourses.findIndex((t) => t.course === course && t.level === level);
+      if (idx === -1) pendingTakenCourses.push({ course, level });
+      else pendingTakenCourses.splice(idx, 1);
+    } else {
+      const label = courseLabel(course, level);
+      if (pendingSubjects.has(label)) pendingSubjects.delete(label);
+      else pendingSubjects.add(label);
+    }
+    renderCourseBrowser();
+  }
+
+  function renderCourseBrowser() {
+    renderCategoryList();
+    renderTakenSummary();
+    if (isTutor) renderQualifiedPanel();
+  }
+
+  function renderCategoryList() {
+    const categoriesEl = document.getElementById("course-categories");
+    const query = courseSearchQuery.trim().toLowerCase();
+
+    categoriesEl.innerHTML = Object.keys(COURSE_CATALOG)
+      .map((category) => {
+        const allRows = getCourseCategoryRows(category);
+        const rows = query ? allRows.filter((r) => r.label.toLowerCase().includes(query)) : allRows;
+        if (query && rows.length === 0) return "";
+
+        const selectedCount = allRows.filter((r) => isCourseSelected(r.course, r.level)).length;
+        const expanded = query ? true : expandedCategories.has(category);
+        const color = CATEGORY_COLORS[category] || "#8a94a6";
+
+        const rowsHtml = rows
+          .map((r) => {
+            const checked = isCourseSelected(r.course, r.level);
+            return `
+              <label class="course-row ${checked ? "selected" : ""}">
+                <input type="checkbox" data-course="${escapeHtml(r.course)}" data-level="${r.level}" ${checked ? "checked" : ""} />
+                <span class="course-row-name">${escapeHtml(r.course)}</span>
+                <span class="course-row-badge">${r.level}</span>
+              </label>`;
+          })
+          .join("");
+
+        return `
+          <div class="course-category ${expanded ? "expanded" : ""}" data-category="${escapeHtml(category)}" style="--category-color:${color}">
+            <button type="button" class="course-category-head">
+              <span class="course-category-swatch"></span>
+              <span class="course-category-name">${escapeHtml(category)}</span>
+              ${selectedCount ? `<span class="course-category-selected">${selectedCount} selected</span>` : ""}
+              <span class="course-category-count">${allRows.length}</span>
+              <svg class="course-category-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="course-category-rows" ${expanded ? "" : 'style="display:none;"'}>${rowsHtml}</div>
+          </div>`;
+      })
+      .join("");
+
+    categoriesEl.querySelectorAll(".course-category-head").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const category = btn.closest(".course-category").dataset.category;
+        if (expandedCategories.has(category)) expandedCategories.delete(category);
+        else expandedCategories.add(category);
+        renderCategoryList();
+      });
+    });
+
+    categoriesEl.querySelectorAll('.course-row input[type="checkbox"]').forEach((input) => {
+      input.addEventListener("change", () => toggleCourseSelection(input.dataset.course, input.dataset.level));
+    });
+  }
+
+  function renderTakenSummary() {
+    const countEl = document.getElementById("taken-summary-count");
+    const tagsEl = document.getElementById("taken-summary-tags");
+    const items = isTutor
+      ? pendingTakenCourses.map((t) => ({ course: t.course, level: t.level, label: courseLabel(t.course, t.level) }))
+      : Array.from(pendingSubjects).map((label) => ({ label }));
+
+    countEl.textContent = `${items.length} COURSE${items.length === 1 ? "" : "S"} ${isTutor ? "TAKEN" : "SELECTED"}`;
+    tagsEl.innerHTML = items
+      .map(
+        (it) => `
+      <span class="course-tag">
+        ${escapeHtml(it.label)}
+        <button type="button" data-course="${escapeHtml(it.course || "")}" data-level="${it.level || ""}" data-label="${escapeHtml(
+          it.label
+        )}" aria-label="Remove">&times;</button>
+      </span>`
+      )
+      .join("");
+
+    tagsEl.querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (isTutor) toggleCourseSelection(btn.dataset.course, btn.dataset.level);
+        else {
+          pendingSubjects.delete(btn.dataset.label);
+          renderCourseBrowser();
+        }
+      });
+    });
+  }
+
+  function renderQualifiedPanel() {
+    const panel = document.getElementById("qualified-panel");
+    if (pendingTakenCourses.length === 0) {
+      panel.style.display = "none";
+      return;
+    }
+    panel.style.display = "block";
+
+    const eligible = getTeachableCourses(pendingTakenCourses).sort(
+      (a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label)
+    );
+    document.getElementById("qualified-toggle-title").textContent = `You're qualified to teach ${eligible.length} course${
+      eligible.length === 1 ? "" : "s"
+    }`;
+    document.getElementById("qualified-list").innerHTML = eligible
+      .map(
+        (c) => `
+      <div class="qualified-row">
+        <span class="qualified-dot" style="background:${CATEGORY_COLORS[c.category] || "#8a94a6"}"></span>
+        <span class="qualified-name">${escapeHtml(c.label)}</span>
+        <span class="qualified-source">${c.viaLabel ? `via ${escapeHtml(c.viaLabel)}` : "You took it"}</span>
+      </div>`
+      )
+      .join("");
+  }
+
+  document.getElementById("course-search-input").addEventListener("input", (e) => {
+    courseSearchQuery = e.target.value;
+    renderCategoryList();
+  });
+  document.getElementById("course-search-clear").addEventListener("click", () => {
+    courseSearchQuery = "";
+    document.getElementById("course-search-input").value = "";
+    renderCategoryList();
+  });
+  document.getElementById("qualified-toggle").addEventListener("click", () => {
+    qualifiedExpanded = !qualifiedExpanded;
+    document.getElementById("qualified-list").style.display = qualifiedExpanded ? "flex" : "none";
+    document.getElementById("qualified-chevron").classList.toggle("open", qualifiedExpanded);
+  });
+
+  renderCourseBrowser();
 
   const availabilityGrid = document.getElementById("availability-grid");
   let availHtml = `<div class="avail-corner"></div>`;
@@ -313,7 +406,7 @@ function initProfileTab() {
       takenCourses: isTutor ? pendingTakenCourses.slice() : [],
     };
     if (isTutor) {
-      newProfile.gradeLevels = [];
+      newProfile.gradeLevels = Array.from(document.querySelectorAll('input[name="grade"]:checked')).map((i) => i.value);
       newProfile.gradeLevel = "";
       const checkedClassYear = document.querySelector('input[name="classYear"]:checked');
       newProfile.classYear = checkedClassYear ? checkedClassYear.value : "";
@@ -333,70 +426,8 @@ function initProfileTab() {
   });
 }
 
-// ---------------- Course picker modal ----------------
-// Category -> course -> level. `isSelected`/`onToggle` are supplied by the
-// caller so the same modal serves both the tutor's "classes taken" list and
-// the tutee's "classes I need help with" list.
-
 function toggleModal(id, show) {
   document.getElementById(id).classList.toggle("show", show);
-}
-
-function openCoursePicker({ title, isSelected, onToggle }) {
-  document.getElementById("course-picker-title").textContent = title;
-  const categoriesEl = document.getElementById("course-picker-categories");
-  const coursesEl = document.getElementById("course-picker-courses");
-  const courseListEl = document.getElementById("course-picker-course-list");
-
-  categoriesEl.style.display = "flex";
-  coursesEl.style.display = "none";
-
-  categoriesEl.innerHTML = Object.keys(COURSE_CATALOG)
-    .map((cat) => `<button type="button" class="course-picker-category-btn" data-category="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`)
-    .join("");
-
-  categoriesEl.querySelectorAll(".course-picker-category-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      categoriesEl.style.display = "none";
-      coursesEl.style.display = "block";
-      renderCourseList(btn.dataset.category);
-    });
-  });
-
-  function renderCourseList(category) {
-    courseListEl.innerHTML = COURSE_CATALOG[category]
-      .map((c) => {
-        const pills = c.levels
-          .map((lvl) => {
-            const added = isSelected(c.name, lvl);
-            const pillText = c.levels.length === 1 ? "Add" : lvl;
-            return `<button type="button" class="course-picker-level-pill ${added ? "added" : ""}" data-course="${escapeHtml(
-              c.name
-            )}" data-level="${lvl}">${added ? "✓ " : ""}${pillText}</button>`;
-          })
-          .join("");
-        return `
-          <div class="course-picker-course-row">
-            <span class="course-picker-course-name">${escapeHtml(c.name)}</span>
-            <span class="course-picker-levels">${pills}</span>
-          </div>`;
-      })
-      .join("");
-
-    courseListEl.querySelectorAll(".course-picker-level-pill").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        onToggle(btn.dataset.course, btn.dataset.level);
-        renderCourseList(category);
-      });
-    });
-  }
-
-  document.getElementById("course-picker-back").onclick = () => {
-    coursesEl.style.display = "none";
-    categoriesEl.style.display = "flex";
-  };
-
-  toggleModal("course-picker-modal", true);
 }
 
 function openLightbox(src) {
@@ -433,12 +464,13 @@ function renderChatList() {
       const msgs = getMessagesForChat(chat.id);
       const last = msgs[msgs.length - 1];
       const preview = last ? (last.attachment ? `📎 ${last.attachment.name}` : last.text) : "No messages yet";
+      const accentColor = subjectColor(chat.subject);
       return `
-        <button class="chat-list-item ${chat.id === activeChatId ? "active" : ""}" data-chat-id="${chat.id}">
-          <span class="chat-avatar">${initials(partnerName)}</span>
+        <button class="chat-list-item ${chat.id === activeChatId ? "active" : ""}" data-chat-id="${chat.id}" style="--accent-color:${accentColor}">
+          <span class="chat-avatar" style="background:${colorForPerson(partnerEmail)}">${initials(partnerName)}</span>
           <span class="chat-list-item-body">
             <span class="chat-list-item-name">${partnerName}</span>
-            <span class="chat-list-item-preview">${escapeHtml(preview)}</span>
+            <span class="chat-list-item-preview"><span class="chip-dot" style="background:${accentColor}"></span>${escapeHtml(preview)}</span>
           </span>
         </button>`;
     })
@@ -458,8 +490,13 @@ function openChat(chatId) {
   document.getElementById("chat-active").style.display = "flex";
 
   const partnerEmail = otherPartyEmail(chat, me.email);
+  const accentColor = subjectColor(chat.subject);
   document.getElementById("chat-partner-name").textContent = formatName(partnerEmail);
-  document.getElementById("chat-subject").textContent = chat.subject || "General tutoring";
+  const subjectEl = document.getElementById("chat-subject");
+  subjectEl.textContent = chat.subject || "General tutoring";
+  subjectEl.style.background = `${accentColor}22`;
+  subjectEl.style.color = accentColor;
+  document.getElementById("chat-thread-head").style.setProperty("--accent-color", accentColor);
   document.getElementById("schedule-btn").style.display = me.role === "tutor" ? "inline-block" : "none";
 
   renderChatList();
@@ -562,60 +599,182 @@ function clearAttachment() {
 
 function initMatchingTab() {
   const isTutor = me.role === "tutor";
-  const oppositeRole = isTutor ? "tutee" : "tutor";
-  document.getElementById("matching-heading").textContent = isTutor ? "Find a Tutee" : "Find a Tutor";
+  document.getElementById("matching-heading").textContent = isTutor ? "Students Who Need What You Teach" : "Tutors For Your Classes";
   document.getElementById("matching-lead").textContent = isTutor
-    ? "Browse tutees and start a chat based on shared subjects."
-    : "Browse tutors and start a chat based on shared subjects.";
+    ? "Ranked by how many of your classes they need help with."
+    : "Ranked by how many of your classes they can teach.";
+
+  const deptFilter = document.getElementById("matching-department-filter");
+  Object.keys(COURSE_CATALOG).forEach((category) => {
+    deptFilter.innerHTML += `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`;
+  });
+  const availFilter = document.getElementById("matching-availability-filter");
+  AVAILABILITY_BLOCKS.forEach((block) => {
+    availFilter.innerHTML += `<option value="${escapeHtml(block)}">${escapeHtml(block)}</option>`;
+  });
+  deptFilter.addEventListener("change", renderMatchingList);
+  availFilter.addEventListener("change", renderMatchingList);
+
+  document.getElementById("candidate-profile-close").addEventListener("click", () => toggleModal("candidate-profile-modal", false));
+
   renderMatchingList();
+}
+
+function candidateSubtitle(profile, candidateIsTutor) {
+  if (candidateIsTutor) {
+    return [profile.classYear, gradeRangeText(profile.gradeLevels)].filter(Boolean).join(" · ");
+  }
+  return profile.gradeLevel ? `${profile.gradeLevel} grade` : "";
+}
+
+function startChatWith(theirEmail) {
+  const myProfile = getProfile(me.email);
+  const theirProfile = getProfile(theirEmail);
+  const shared = myProfile.subjects.find((s) => theirProfile.subjects.includes(s));
+  const subject = shared || theirProfile.subjects[0] || myProfile.subjects[0] || "General tutoring";
+  const tutorEmail = me.role === "tutor" ? me.email : theirEmail;
+  const tuteeEmail = me.role === "tutor" ? theirEmail : me.email;
+  const chat = createChat(tutorEmail, tuteeEmail, subject);
+  window.goToTab("chats");
+  openChat(chat.id);
+}
+
+function openCandidateProfileModal(user, profile, candidateIsTutor) {
+  document.getElementById("candidate-profile-name").textContent = user.name;
+  document.getElementById("candidate-profile-subtitle").textContent = candidateSubtitle(profile, candidateIsTutor);
+  document.getElementById("candidate-profile-bio").textContent = profile.bio || "No bio yet.";
+  document.getElementById("candidate-profile-courses-label").textContent = candidateIsTutor
+    ? "Classes They Can Teach"
+    : "Classes They Need Help With";
+
+  const avatarImg = document.getElementById("candidate-profile-avatar-img");
+  const avatarInitials = document.getElementById("candidate-profile-avatar-initials");
+  if (profile.photo) {
+    avatarImg.src = profile.photo;
+    avatarImg.style.display = "block";
+    avatarInitials.style.display = "none";
+  } else {
+    avatarImg.style.display = "none";
+    avatarInitials.style.display = "flex";
+    avatarInitials.textContent = initials(user.name);
+  }
+
+  const coursesEl = document.getElementById("candidate-profile-courses");
+  coursesEl.innerHTML = profile.subjects.length
+    ? profile.subjects.map((s) => `<span class="course-tag">${escapeHtml(s)}</span>`).join("")
+    : `<p class="chat-list-empty">Nothing listed yet.</p>`;
+
+  document.getElementById("candidate-profile-chat-btn").onclick = () => {
+    toggleModal("candidate-profile-modal", false);
+    startChatWith(user.email);
+  };
+
+  toggleModal("candidate-profile-modal", true);
 }
 
 function renderMatchingList() {
   const listEl = document.getElementById("matching-list");
+  const legendEl = document.getElementById("matching-legend-text");
   if (!listEl) return;
 
-  const oppositeRole = me.role === "tutor" ? "tutee" : "tutor";
+  const isTutor = me.role === "tutor";
+  const oppositeRole = isTutor ? "tutee" : "tutor";
   const candidates = getUsers().filter((u) => u.role === oppositeRole && u.email !== me.email);
+  const myProfile = getProfile(me.email);
+
+  // Only candidates where the tutor is qualified to teach at least one class
+  // the tutee needs — i.e. the two "classes taken/can teach" and "classes
+  // need help with" lists actually overlap.
+  const matched = candidates
+    .map((u) => {
+      const profile = getProfile(u.email);
+      const shared = myProfile.subjects.filter((s) => profile.subjects.includes(s));
+      return { user: u, profile, shared };
+    })
+    .filter((m) => m.shared.length > 0)
+    .sort((a, b) => b.shared.length - a.shared.length);
+
+  const deptValue = document.getElementById("matching-department-filter").value;
+  const availValue = document.getElementById("matching-availability-filter").value;
+  const filtered = matched.filter((m) => {
+    const deptOk = !deptValue || m.shared.some((label) => categoryForLabel(label) === deptValue);
+    const availOk = !availValue || m.profile.availability.some((a) => a.endsWith(availValue));
+    return deptOk && availOk;
+  });
+
+  legendEl.textContent = `A filled sky chip means you both have that exact class. ${filtered.length} ${
+    oppositeRole
+  }${filtered.length === 1 ? "" : "s"} match right now.`;
+
+  const departmentCount = new Set(myProfile.subjects.map(categoryForLabel).filter(Boolean)).size;
+  document.getElementById("matching-stats").innerHTML = `
+    <div class="matching-stat"><span class="matching-stat-num">${matched.length}</span><span class="matching-stat-label">Matches</span></div>
+    <div class="matching-stat"><span class="matching-stat-num">${myProfile.subjects.length}</span><span class="matching-stat-label">${
+    isTutor ? "Classes You Teach" : "Classes You Need"
+  }</span></div>
+    <div class="matching-stat"><span class="matching-stat-num">${departmentCount}</span><span class="matching-stat-label">Departments</span></div>
+  `;
 
   if (candidates.length === 0) {
     listEl.innerHTML = `<p class="chat-list-empty">No ${oppositeRole}s have signed up yet. Check back soon.</p>`;
     return;
   }
+  if (matched.length === 0) {
+    listEl.innerHTML = `<p class="chat-list-empty">No ${oppositeRole}s share any of your classes yet. Update your classes on your profile, or check back soon.</p>`;
+    return;
+  }
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<p class="chat-list-empty">No matches for these filters. Try a different department or availability.</p>`;
+    return;
+  }
 
-  const myProfile = getProfile(me.email);
-  listEl.innerHTML = candidates
-    .map((u) => {
-      const theirProfile = getProfile(u.email);
-      const shared = myProfile.subjects.filter((s) => theirProfile.subjects.includes(s));
-      const subjectsHtml = theirProfile.subjects.length
-        ? theirProfile.subjects
-            .map((s) => `<span class="match-subject-chip ${shared.includes(s) ? "shared" : ""}">${escapeHtml(s)}</span>`)
-            .join("")
-        : `<span class="match-subject-chip">No subjects listed yet</span>`;
+  listEl.innerHTML = filtered
+    .map(({ user: u, profile, shared }) => {
+      const chipsHtml = shared
+        .map(
+          (s) =>
+            `<span class="match-subject-chip shared"><span class="chip-dot" style="background:${subjectColor(s)}"></span>${escapeHtml(
+              s
+            )}</span>`
+        )
+        .join("");
+      const subtitle = candidateSubtitle(profile, !isTutor);
       const existingChat = findChat(me.role === "tutor" ? me.email : u.email, me.role === "tutor" ? u.email : me.email);
+      const accentColor = subjectColor(shared[0]);
       return `
-        <div class="match-row">
-          <span class="chat-avatar">${initials(u.name)}</span>
+        <div class="match-row" style="--accent-color:${accentColor}">
+          <span class="chat-avatar" style="background:${colorForPerson(u.email)}">${initials(u.name)}</span>
           <span class="match-row-body">
-            <span class="new-chat-row-name">${escapeHtml(u.name)}</span>
-            <span class="match-subjects">${subjectsHtml}</span>
+            <span class="match-row-name-line">
+              <span class="new-chat-row-name">${escapeHtml(u.name)}</span>
+              ${subtitle ? `<span class="match-row-subtitle">${escapeHtml(subtitle)}</span>` : ""}
+            </span>
+            <span class="match-subjects">${chipsHtml}</span>
           </span>
-          <button class="btn-primary new-chat-start" data-email="${u.email}">${existingChat ? "Go to Chat" : "Start Chat"}</button>
+          <span class="match-row-side">
+            <span class="match-shared-badge">${shared.length} shared</span>
+            <span class="match-row-actions">
+              <button class="btn-ghost match-view-profile" data-email="${u.email}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                View Profile
+              </button>
+              <button class="btn-primary new-chat-start" data-email="${u.email}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                ${existingChat ? "Go to Chat" : "Start Chat"}
+              </button>
+            </span>
+          </span>
         </div>`;
     })
     .join("");
 
   listEl.querySelectorAll(".new-chat-start").forEach((btn) => {
+    btn.addEventListener("click", () => startChatWith(btn.dataset.email));
+  });
+  listEl.querySelectorAll(".match-view-profile").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const theirEmail = btn.dataset.email;
-      const theirProfile = getProfile(theirEmail);
-      const shared = myProfile.subjects.find((s) => theirProfile.subjects.includes(s));
-      const subject = shared || theirProfile.subjects[0] || myProfile.subjects[0] || "General tutoring";
-      const tutorEmail = me.role === "tutor" ? me.email : theirEmail;
-      const tuteeEmail = me.role === "tutor" ? theirEmail : me.email;
-      const chat = createChat(tutorEmail, tuteeEmail, subject);
-      window.goToTab("chats");
-      openChat(chat.id);
+      const match = filtered.find((m) => m.user.email === btn.dataset.email);
+      if (match) openCandidateProfileModal(match.user, match.profile, !isTutor);
     });
   });
 }
@@ -749,7 +908,7 @@ function sessionListHtml(sessions) {
       }
 
       return `
-        <div class="session-card">
+        <div class="session-card" style="--accent-color:${subjectColor(s.subject)}">
           <span class="session-partner">${formatName(partnerEmail)}</span>
           <span class="session-subject">${escapeHtml(s.subject || "General tutoring")}</span>
           <span class="session-time">${formatDateTime(s.datetime)} · ${s.durationMinutes} min</span>
@@ -775,6 +934,21 @@ function countdownText(ms) {
   if (hours < 24) return `Starts in ${hours}h ${remMinutes}m`;
   const days = Math.floor(hours / 24);
   return `Starts in ${days}d`;
+}
+
+// ---------------- Color helpers ----------------
+// Deterministic per-person avatar color (hashed from email, stable across
+// reloads) and per-subject color (reusing the course-catalog category
+// palette), so the Matching and Chats UIs read as more distinct/lively.
+
+function colorForPerson(key) {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return PERSON_COLORS[hash % PERSON_COLORS.length];
+}
+
+function subjectColor(subject) {
+  return CATEGORY_COLORS[categoryForLabel(subject)] || "#8a94a6";
 }
 
 // ---------------- Formatting helpers ----------------

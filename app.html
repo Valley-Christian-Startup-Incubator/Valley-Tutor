@@ -32,61 +32,90 @@
 
   <!-- PROFILE TAB (opened via the header icon, not a nav tab) -->
   <section class="app-panel" id="panel-profile">
-    <div class="profile-shell">
-      <h1 id="profile-heading">Your Profile</h1>
-      <p class="profile-lead" id="profile-lead">Tell tutors what you need help with so we can point them your way.</p>
-
+    <div class="profile-shell-v2">
       <div class="alert alert-success" id="profile-alert" role="status"></div>
 
       <form id="profile-form">
-        <div class="profile-field">
-          <label>Profile Photo</label>
-          <div class="avatar-upload">
-            <div class="avatar-preview" id="avatar-preview">
-              <img id="avatar-preview-img" style="display:none;" alt="" />
-              <span id="avatar-preview-initials"></span>
+        <div class="profile-grid">
+
+          <!-- LEFT COLUMN -->
+          <div class="profile-col-left">
+            <div class="profile-card">
+              <div class="avatar-upload">
+                <div class="avatar-preview" id="avatar-preview">
+                  <img id="avatar-preview-img" style="display:none;" alt="" />
+                  <span id="avatar-preview-initials"></span>
+                </div>
+                <div class="avatar-upload-actions">
+                  <button type="button" class="btn-ghost" id="avatar-upload-btn">Change Photo</button>
+                  <button type="button" class="link-btn" id="avatar-remove-btn" style="display:none;">Remove</button>
+                </div>
+                <input type="file" id="avatar-input" accept="image/*" hidden />
+              </div>
+
+              <h2 class="profile-name" id="profile-name-heading"></h2>
+              <p class="profile-subtitle" id="profile-subtitle"></p>
+
+              <div class="profile-field">
+                <label for="bio-input">Bio</label>
+                <textarea id="bio-input" rows="4" maxlength="400" placeholder="Tell people a bit about yourself…"></textarea>
+                <p class="field-hint" id="bio-hint"></p>
+              </div>
+
+              <div class="profile-field" id="class-year-field">
+                <label>Your Class</label>
+                <div class="chip-grid" id="class-year-grid"></div>
+              </div>
+
+              <div class="profile-field" id="grade-level-field">
+                <label id="grade-label">Grade Level</label>
+                <div class="chip-grid" id="grade-grid"></div>
+              </div>
             </div>
-            <div class="avatar-upload-actions">
-              <button type="button" class="btn-ghost" id="avatar-upload-btn">Upload Photo</button>
-              <button type="button" class="link-btn" id="avatar-remove-btn" style="display:none;">Remove</button>
+
+            <div class="profile-card">
+              <div class="avail-card-head">
+                <h2>When You're Free</h2>
+                <span class="field-hint">Tap to toggle</span>
+              </div>
+              <div class="availability-grid" id="availability-grid"></div>
             </div>
-            <input type="file" id="avatar-input" accept="image/*" hidden />
           </div>
+
+          <!-- RIGHT COLUMN -->
+          <div class="profile-col-right">
+            <div class="profile-card">
+              <h2 id="course-browser-heading">Classes</h2>
+              <p class="profile-lead" id="course-browser-lead"></p>
+
+              <div class="course-search-row">
+                <input type="text" id="course-search-input" autocomplete="off" />
+                <button type="button" class="btn-ghost" id="course-search-clear">Clear</button>
+              </div>
+
+              <div class="taken-summary">
+                <span class="taken-summary-count" id="taken-summary-count"></span>
+                <div class="course-tags" id="taken-summary-tags"></div>
+              </div>
+
+              <div class="course-categories" id="course-categories"></div>
+
+              <div class="qualified-panel" id="qualified-panel" style="display:none;">
+                <button type="button" class="qualified-toggle" id="qualified-toggle">
+                  <span class="qualified-toggle-text">
+                    <span class="qualified-toggle-title" id="qualified-toggle-title"></span>
+                    <span class="qualified-toggle-sub">Derived from prerequisites — no need to list them yourself.</span>
+                  </span>
+                  <svg class="qualified-chevron" id="qualified-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="qualified-list" id="qualified-list" style="display:none;"></div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <div class="profile-field">
-          <label for="bio-input">Bio</label>
-          <textarea id="bio-input" rows="4" maxlength="400" placeholder="Tell people a bit about yourself…"></textarea>
-        </div>
-
-        <div class="profile-field" id="class-year-field">
-          <label>Your Class</label>
-          <div class="chip-grid" id="class-year-grid"></div>
-        </div>
-
-        <div class="profile-field" id="taken-courses-field">
-          <label>Classes You've Taken</label>
-          <div class="course-tags" id="taken-courses-tags"></div>
-          <button type="button" class="btn-ghost" id="taken-courses-add-btn">+ Add a Class</button>
-        </div>
-
-        <div class="profile-field" id="subjects-field">
-          <label id="subjects-label">Subjects</label>
-          <div class="course-tags" id="subjects-tags"></div>
-          <button type="button" class="btn-ghost" id="subjects-add-btn" style="display:none;">+ Add a Class</button>
-        </div>
-
-        <div class="profile-field" id="grade-level-field">
-          <label id="grade-label">Grade Level</label>
-          <div class="chip-grid" id="grade-grid"></div>
-        </div>
-
-        <div class="profile-field">
-          <label>Availability</label>
-          <div class="availability-grid" id="availability-grid"></div>
-        </div>
-
-        <button type="submit" class="btn-primary" style="max-width:220px;">Save Profile</button>
+        <button type="submit" class="btn-primary profile-save-btn">Save Profile</button>
       </form>
 
       <div class="profile-footer">
@@ -99,8 +128,29 @@
   <!-- MATCHING TAB -->
   <section class="app-panel" id="panel-matching">
     <div class="matching-shell">
-      <h1 id="matching-heading">Find a Match</h1>
-      <p class="profile-lead" id="matching-lead">Browse students based on shared subjects, then start a chat.</p>
+      <div class="matching-hero">
+        <div class="matching-hero-top">
+          <div>
+            <h1 id="matching-heading">Find a Match</h1>
+            <p class="matching-hero-lead" id="matching-lead">Ranked by how many of your classes overlap.</p>
+          </div>
+          <div class="matching-filters">
+            <select id="matching-department-filter">
+              <option value="">All departments</option>
+            </select>
+            <select id="matching-availability-filter">
+              <option value="">Any availability</option>
+            </select>
+          </div>
+        </div>
+        <div class="matching-stats" id="matching-stats"></div>
+      </div>
+
+      <div class="matching-legend">
+        <span class="match-subject-chip shared">Shared</span>
+        <span id="matching-legend-text"></span>
+      </div>
+
       <div id="matching-list" class="matching-list"></div>
     </div>
   </section>
@@ -121,7 +171,7 @@
           <p>Select a chat to get going, or visit the Matching tab to start one.</p>
         </div>
         <div id="chat-active" class="chat-active" style="display:none;">
-          <div class="chat-thread-head">
+          <div class="chat-thread-head" id="chat-thread-head">
             <div>
               <h2 id="chat-partner-name"></h2>
               <span class="chat-subject" id="chat-subject"></span>
@@ -198,30 +248,35 @@
 
 </main>
 
-<!-- Course picker modal: category -> course -> level. Reused for both the
-     tutor's "classes you've taken" and the "classes you need help with"
-     picker (tutees, and tutors adding subjects outside their taken classes
-     isn't allowed — see app.js). -->
-<div class="modal-overlay" id="course-picker-modal">
-  <div class="modal">
-    <div class="modal-head">
-      <h3 id="course-picker-title">Add a Class</h3>
-      <button class="modal-close" id="course-picker-close" aria-label="Close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div id="course-picker-categories" class="course-picker-categories"></div>
-      <div id="course-picker-courses" class="course-picker-courses" style="display:none;">
-        <button type="button" class="link-btn course-picker-back" id="course-picker-back">&larr; Categories</button>
-        <div id="course-picker-course-list" class="course-picker-course-list"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- Image lightbox: clicking a shared photo in chat opens it here instead of downloading it. -->
 <div class="modal-overlay lightbox-overlay" id="image-lightbox">
   <button class="lightbox-close" id="lightbox-close" aria-label="Close">&times;</button>
   <img class="lightbox-img" id="lightbox-img" src="" alt="" />
+</div>
+
+<!-- Candidate profile preview, opened from the Matching tab. -->
+<div class="modal-overlay" id="candidate-profile-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="candidate-profile-name"></h3>
+      <button class="modal-close" id="candidate-profile-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="candidate-profile-top">
+        <div class="avatar-preview" id="candidate-profile-avatar">
+          <img id="candidate-profile-avatar-img" style="display:none;" alt="" />
+          <span id="candidate-profile-avatar-initials"></span>
+        </div>
+        <p class="candidate-profile-subtitle" id="candidate-profile-subtitle"></p>
+      </div>
+      <p class="candidate-profile-bio" id="candidate-profile-bio"></p>
+      <div class="candidate-profile-section">
+        <h4 id="candidate-profile-courses-label"></h4>
+        <div class="course-tags" id="candidate-profile-courses"></div>
+      </div>
+      <button type="button" class="btn-primary" id="candidate-profile-chat-btn" style="max-width:none;">Start Chat</button>
+    </div>
+  </div>
 </div>
 
 <script src="core.js"></script>

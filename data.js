@@ -88,6 +88,14 @@ const COURSE_CATALOG = {
   ],
 };
 
+const CATEGORY_COLORS = {
+  English: "#7c5cd6",
+  Math: "#1a8f80",
+  Science: "#4c9a5b",
+  "Social Sciences": "#a13b52",
+  "World Language": "#d98a34",
+};
+
 function findCatalogCourse(course) {
   for (const category of Object.keys(COURSE_CATALOG)) {
     const found = COURSE_CATALOG[category].find((c) => c.name === course);
@@ -100,6 +108,41 @@ function courseLabel(course, level) {
   if (level === "AP") return `AP ${course}`;
   if (level === "Honors") return `${course} Honors`;
   return course;
+}
+
+// Flattens a category into one selectable row per (course, level) pair —
+// e.g. Chemistry (Regular/Honors/AP) becomes three separate rows.
+function getCourseCategoryRows(category) {
+  return COURSE_CATALOG[category].flatMap((c) =>
+    c.levels.map((level) => ({ course: c.name, level, category, label: courseLabel(c.name, level) }))
+  );
+}
+
+function totalCatalogCourseCount() {
+  return Object.values(COURSE_CATALOG).reduce((sum, courses) => sum + courses.length, 0);
+}
+
+let labelCategoryCache = null;
+function categoryForLabel(label) {
+  if (!labelCategoryCache) {
+    labelCategoryCache = {};
+    Object.keys(COURSE_CATALOG).forEach((category) => {
+      getCourseCategoryRows(category).forEach((r) => {
+        labelCategoryCache[r.label] = category;
+      });
+    });
+  }
+  return labelCategoryCache[label] || "";
+}
+
+// "6th"/"12th" -> 6/12, for turning a tutor's gradeLevels selection into a
+// human-readable range like "teaches grades 6-10".
+function gradeRangeText(gradeLevels) {
+  if (!gradeLevels || gradeLevels.length === 0) return "";
+  const numbers = gradeLevels.map((g) => parseInt(g, 10)).sort((a, b) => a - b);
+  const min = numbers[0];
+  const max = numbers[numbers.length - 1];
+  return min === max ? `teaches grade ${min}` : `teaches grades ${min}-${max}`;
 }
 
 // Cross-course prerequisite edges, beyond the automatic same-course level
@@ -162,15 +205,14 @@ const CROSS_COURSE_PREREQS = [
   ]),
 ];
 
-// Given the classes a tutor has taken, returns every class (course + level)
-// they're qualified to teach: anything they took, anything at a lower level
-// of the same course (AP unlocks Honors and Regular of that course, Honors
-// unlocks Regular), and anything reachable through CROSS_COURSE_PREREQS —
-// transitively, so taking Advanced Data Analysis also unlocks Statistics
-// Honors (AP Statistics is the direct prereq, and AP unlocks Honors in turn).
-function getTeachableCourses(takenCourses) {
+// Everything reachable from a single (course, level): itself, any lower
+// level of the same course (AP unlocks Honors and Regular, Honors unlocks
+// Regular), and anything chained through CROSS_COURSE_PREREQS — transitively,
+// so Advanced Data Analysis also reaches Statistics Honors (AP Statistics is
+// the direct prereq, and AP unlocks Honors of that same course in turn).
+function reachableFrom(startCourse, startLevel) {
   const unlocked = new Map(); // "course::level" -> {course, level}
-  const queue = (takenCourses || []).map((t) => ({ course: t.course, level: t.level }));
+  const queue = [{ course: startCourse, level: startLevel }];
 
   while (queue.length) {
     const { course, level } = queue.shift();
@@ -195,13 +237,43 @@ function getTeachableCourses(takenCourses) {
     });
   }
 
-  return Array.from(unlocked.values()).map(({ course, level }) => {
+  return Array.from(unlocked.values());
+}
+
+// Given the classes a tutor has taken, returns every class they're qualified
+// to teach, each tagged with `viaLabel`: null if they took it directly, or
+// the label of the taken class that unlocked it (tracing back to the root
+// taken class even across multiple hops, e.g. Algebra 1 shows "via AP
+// Calculus BC" rather than an intermediate step) — so the UI can show
+// "You took it" vs. "via X".
+function getTeachableCourses(takenCourses) {
+  const taken = takenCourses || [];
+  const takenKeys = new Set(taken.map((t) => `${t.course}::${t.level}`));
+  const results = new Map(); // "course::level" -> { course, level, sourceLabel }
+
+  taken.forEach((t) => {
+    reachableFrom(t.course, t.level).forEach(({ course, level }) => {
+      const key = `${course}::${level}`;
+      if (!results.has(key)) {
+        results.set(key, { course, level, sourceLabel: courseLabel(t.course, t.level) });
+      }
+    });
+  });
+
+  return Array.from(results.values()).map(({ course, level, sourceLabel }) => {
     const catalogEntry = findCatalogCourse(course);
-    return { course, level, category: catalogEntry ? catalogEntry.category : "", label: courseLabel(course, level) };
+    const key = `${course}::${level}`;
+    return {
+      course,
+      level,
+      category: catalogEntry ? catalogEntry.category : "",
+      label: courseLabel(course, level),
+      viaLabel: takenKeys.has(key) ? null : sourceLabel,
+    };
   });
 }
 
-const GRADE_LEVELS = ["Elementary", "Junior High", "High School"];
+const GRADE_LEVELS = ["6th", "7th", "8th", "9th", "10th", "11th", "12th"];
 const CLASS_YEARS = ["Freshman", "Sophomore", "Junior", "Senior"];
 const AVAILABILITY_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const AVAILABILITY_BLOCKS = ["Before School", "After School", "Evening"];
