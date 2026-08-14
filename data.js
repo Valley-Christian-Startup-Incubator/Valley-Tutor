@@ -2,6 +2,7 @@ const PROFILES_KEY = "wc_profiles";
 const CHATS_KEY = "wc_chats";
 const MESSAGES_KEY = "wc_messages";
 const SESSIONS_KEY = "wc_sessions";
+const COMMENTS_KEY = "wc_comments";
 
 // ---------- Course catalog ----------
 // Pulled from the school's course list, teachers stripped (a class taught by
@@ -276,14 +277,27 @@ function getTeachableCourses(takenCourses) {
 const GRADE_LEVELS = ["6th", "7th", "8th", "9th", "10th", "11th", "12th"];
 const CLASS_YEARS = ["Freshman", "Sophomore", "Junior", "Senior"];
 const AVAILABILITY_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-const AVAILABILITY_BLOCKS = ["Before School", "After School", "Evening"];
+const AVAILABILITY_BLOCKS = ["Before School", "Warrior Time", "After School", "Evening"];
+// Evening is Zoom-only (no location to collect); the rest happen on campus,
+// where the tutor/tutee picks a specific location (library, room number...).
+const ZOOM_ONLY_BLOCKS = ["Evening"];
+
+const PAYMENT_METHODS = ["Venmo", "Zelle", "PayPal", "Cash"];
 
 function readJSON(key, fallback) {
   return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
 }
 
 function writeJSON(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    // Most likely a quota overrun from a large photo/video data URL — this is
+    // a prototype storing everything in localStorage, so there's no server
+    // fallback, just a clear message instead of a silent failure.
+    alert("This device is out of local storage space. Try removing a photo, video, or old chat attachment and saving again.");
+    throw err;
+  }
 }
 
 // ---------- Profiles ----------
@@ -303,6 +317,15 @@ function getProfile(email) {
       gradeLevel: "",
       gradeLevels: [],
       availability: [],
+      availabilityLocations: {},
+      introVideo: "",
+      rate: "",
+      offer: "",
+      tutoringHours: "",
+      paymentMethods: [],
+      paymentHandle: "",
+      music: "",
+      athletics: "",
     }
   );
 }
@@ -417,6 +440,72 @@ function createSession({ chatId, tutorEmail, tuteeEmail, subject, datetime, dura
   return session;
 }
 
+// ---------- Comments (tutee feedback on tutors) ----------
+// Not real moderation — there's no backend or human reviewer here, just a
+// keyword heuristic standing in for one. "Warm" comments show up on the
+// tutor's profile immediately; "cold" ones are held back (never shown to
+// anyone in this prototype) instead of being emailed to a coordinator, since
+// there's nowhere to send that email from a static site.
+
+const NEGATIVE_COMMENT_WORDS = [
+  "bad",
+  "rude",
+  "late",
+  "unprepared",
+  "mean",
+  "awful",
+  "terrible",
+  "worst",
+  "unhelpful",
+  "disrespectful",
+  "cancel",
+  "no show",
+  "noshow",
+  "yell",
+  "angry",
+  "hate",
+  "horrible",
+  "waste",
+  "annoying",
+  "condescending",
+  "never showed",
+  "didn't show",
+  "didn't help",
+  "confusing",
+  "useless",
+];
+
+function classifyComment(text) {
+  const lower = text.toLowerCase();
+  return NEGATIVE_COMMENT_WORDS.some((w) => lower.includes(w)) ? "cold" : "warm";
+}
+
+function getComments() {
+  return readJSON(COMMENTS_KEY, []);
+}
+
+function getVisibleCommentsForTutor(tutorEmail) {
+  return getComments()
+    .filter((c) => c.tutorEmail === tutorEmail && c.sentiment === "warm")
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function addComment(tutorEmail, authorEmail, text) {
+  const comments = getComments();
+  const comment = {
+    id: crypto.randomUUID(),
+    tutorEmail,
+    authorEmail,
+    text,
+    sentiment: classifyComment(text),
+    createdAt: new Date().toISOString(),
+  };
+  comments.push(comment);
+  writeJSON(COMMENTS_KEY, comments);
+  notifyUpdate("comment");
+  return comment;
+}
+
 // ---------- Cross-tab live updates ----------
 // Chats/sessions are demoed across two tabs in the same browser (tutor +
 // tutee), so a BroadcastChannel keeps every open tab in sync without a
@@ -433,7 +522,7 @@ function onUpdate(callback) {
     wcChannel.onmessage = (e) => callback(e.data.type);
   }
   window.addEventListener("storage", (e) => {
-    if ([PROFILES_KEY, CHATS_KEY, MESSAGES_KEY, SESSIONS_KEY].includes(e.key)) {
+    if ([PROFILES_KEY, CHATS_KEY, MESSAGES_KEY, SESSIONS_KEY, COMMENTS_KEY].includes(e.key)) {
       callback("storage");
     }
   });

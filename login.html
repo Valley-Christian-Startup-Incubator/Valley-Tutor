@@ -109,6 +109,28 @@
           <div class="field-error"></div>
         </div>
 
+        <div class="field">
+          <label>Profile photo (optional)</label>
+          <div class="avatar-upload">
+            <div class="avatar-preview" id="signup-avatar-preview">
+              <img id="signup-avatar-preview-img" style="display:none;" alt="" />
+              <span id="signup-avatar-preview-initials">?</span>
+            </div>
+            <div class="avatar-upload-actions">
+              <button type="button" class="btn-ghost" id="signup-avatar-upload-btn">Upload Photo</button>
+              <button type="button" class="link-btn" id="signup-avatar-remove-btn" style="display:none;">Remove</button>
+            </div>
+            <input type="file" id="signup-avatar-input" accept="image/*" hidden />
+          </div>
+        </div>
+
+        <div class="field" id="field-signup-video" style="display:none;">
+          <label>30-45 second intro video (optional)</label>
+          <input type="file" id="signup-video-input" accept="video/*" />
+          <div class="field-hint" id="signup-video-hint">A short clip introducing yourself to prospective tutees. Under 20MB.</div>
+          <div class="field-error" id="signup-video-error"></div>
+        </div>
+
         <div class="field" id="field-signup-email">
           <label for="signup-email">School email</label>
           <input type="email" id="signup-email" autocomplete="email" placeholder="you@vcs.net" />
@@ -160,6 +182,7 @@
 </div>
 
 <script src="core.js"></script>
+<script src="data.js"></script>
 <script src="auth.js"></script>
 </body>
 </html>

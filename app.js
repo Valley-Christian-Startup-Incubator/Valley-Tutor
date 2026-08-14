@@ -205,6 +205,88 @@ function initProfileTab() {
     ).join("");
   }
 
+  // ---- Details card: video/rate/hours (tutor), offer/payment (tutee), music/athletics (both) ----
+  document.getElementById("intro-video-field").style.display = isTutor ? "" : "none";
+  document.getElementById("rate-field").style.display = isTutor ? "" : "none";
+  document.getElementById("tutoring-hours-field").style.display = isTutor ? "" : "none";
+  document.getElementById("offer-field").style.display = isTutor ? "none" : "";
+  document.getElementById("payment-methods-field").style.display = isTutor ? "none" : "";
+
+  let pendingIntroVideo = profile.introVideo || "";
+  renderIntroVideoPreview(pendingIntroVideo);
+
+  function renderIntroVideoPreview(dataUrl) {
+    const videoEl = document.getElementById("intro-video-preview");
+    const removeBtn = document.getElementById("intro-video-remove-btn");
+    if (dataUrl) {
+      videoEl.src = dataUrl;
+      videoEl.style.display = "block";
+      removeBtn.style.display = "inline";
+    } else {
+      videoEl.removeAttribute("src");
+      videoEl.style.display = "none";
+      removeBtn.style.display = "none";
+    }
+  }
+
+  document.getElementById("intro-video-upload-btn").addEventListener("click", () => document.getElementById("intro-video-input").click());
+  document.getElementById("intro-video-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    const errorEl = document.getElementById("intro-video-error");
+    errorEl.textContent = "";
+    if (!file) return;
+    readVideoWithChecks(file)
+      .then((dataUrl) => {
+        pendingIntroVideo = dataUrl;
+        renderIntroVideoPreview(pendingIntroVideo);
+      })
+      .catch((err) => {
+        errorEl.textContent = err.message;
+        e.target.value = "";
+      });
+  });
+  document.getElementById("intro-video-remove-btn").addEventListener("click", () => {
+    pendingIntroVideo = "";
+    renderIntroVideoPreview(pendingIntroVideo);
+  });
+
+  document.getElementById("rate-input").value = profile.rate || "";
+  document.getElementById("tutoring-hours-input").value = profile.tutoringHours || "";
+  document.getElementById("offer-input").value = profile.offer || "";
+  document.getElementById("music-input").value = profile.music || "";
+  document.getElementById("athletics-input").value = profile.athletics || "";
+  document.getElementById("payment-handle-input").value = profile.paymentHandle || "";
+
+  document.getElementById("payment-methods-grid").innerHTML = PAYMENT_METHODS.map(
+    (m) => `
+    <label class="chip">
+      <input type="checkbox" name="paymentMethod" value="${m}" ${(profile.paymentMethods || []).includes(m) ? "checked" : ""} />
+      <span>${m}</span>
+    </label>`
+  ).join("");
+
+  // Comments a tutor has received (warm ones only — cold feedback is held
+  // back, see data.js). Tutees don't have a comments card.
+  const commentsCard = document.getElementById("tutor-comments-card");
+  if (isTutor) {
+    commentsCard.style.display = "block";
+    const comments = getVisibleCommentsForTutor(me.email);
+    document.getElementById("tutor-comments-list").innerHTML = comments.length
+      ? comments
+          .map(
+            (c) => `
+        <div class="tutor-comment-row">
+          <span class="tutor-comment-author">${escapeHtml(formatName(c.authorEmail))}</span>
+          <span class="tutor-comment-date">${formatDateTime(c.createdAt)}</span>
+          <p class="tutor-comment-text">${escapeHtml(c.text)}</p>
+        </div>`
+          )
+          .join("")
+      : `<p class="chat-list-empty">No feedback yet.</p>`;
+  } else {
+    commentsCard.style.display = "none";
+  }
+
   // ---- Inline course browser: search + category accordions ----
   // Tutor: "Classes You've Taken" drives the qualified-to-teach dropdown.
   // Tutee: "Classes You Need Help With" is a free pick, no eligibility gate.
@@ -380,7 +462,9 @@ function initProfileTab() {
 
   const availabilityGrid = document.getElementById("availability-grid");
   let availHtml = `<div class="avail-corner"></div>`;
-  AVAILABILITY_BLOCKS.forEach((b) => (availHtml += `<div class="avail-block-label">${b}</div>`));
+  AVAILABILITY_BLOCKS.forEach(
+    (b) => (availHtml += `<div class="avail-block-label">${escapeHtml(b)}<br />${ZOOM_ONLY_BLOCKS.includes(b) ? "(Zoom)" : "(on campus)"}</div>`)
+  );
   AVAILABILITY_DAYS.forEach((day) => {
     availHtml += `<div class="avail-day-label">${day}</div>`;
     AVAILABILITY_BLOCKS.forEach((block) => {
@@ -394,16 +478,43 @@ function initProfileTab() {
   });
   availabilityGrid.innerHTML = availHtml;
 
+  const availLocations = profile.availabilityLocations || {};
+  document.getElementById("avail-locations").innerHTML =
+    `<div class="avail-location-corner"></div>` +
+    AVAILABILITY_BLOCKS.map((block) => {
+      const isZoom = ZOOM_ONLY_BLOCKS.includes(block);
+      return `
+        <div class="avail-location-field">
+          <label>Location</label>
+          <input type="text" data-block="${escapeHtml(block)}" ${isZoom ? "value=\"Zoom\" disabled" : `value="${escapeHtml(availLocations[block] || "")}" placeholder="e.g. Library"`} />
+        </div>`;
+    }).join("");
+
   document.getElementById("profile-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const availability = Array.from(document.querySelectorAll('input[name="availability"]:checked')).map((i) => i.value);
+    const availabilityLocations = {};
+    document.querySelectorAll("#avail-locations input[data-block]").forEach((input) => {
+      availabilityLocations[input.dataset.block] = input.disabled ? "Zoom" : input.value.trim();
+    });
     const subjects = isTutor ? getTeachableCourses(pendingTakenCourses).map((c) => c.label) : Array.from(pendingSubjects);
     const newProfile = {
       subjects,
       availability,
+      availabilityLocations,
       photo: pendingPhoto,
       bio: document.getElementById("bio-input").value.trim(),
       takenCourses: isTutor ? pendingTakenCourses.slice() : [],
+      introVideo: isTutor ? pendingIntroVideo : "",
+      rate: isTutor ? document.getElementById("rate-input").value.trim() : "",
+      tutoringHours: isTutor ? document.getElementById("tutoring-hours-input").value.trim() : "",
+      offer: isTutor ? "" : document.getElementById("offer-input").value.trim(),
+      paymentMethods: isTutor
+        ? []
+        : Array.from(document.querySelectorAll('input[name="paymentMethod"]:checked')).map((i) => i.value),
+      paymentHandle: isTutor ? "" : document.getElementById("payment-handle-input").value.trim(),
+      music: document.getElementById("music-input").value.trim(),
+      athletics: document.getElementById("athletics-input").value.trim(),
     };
     if (isTutor) {
       newProfile.gradeLevels = Array.from(document.querySelectorAll('input[name="grade"]:checked')).map((i) => i.value);
@@ -659,6 +770,43 @@ function openCandidateProfileModal(user, profile, candidateIsTutor) {
     avatarInitials.textContent = initials(user.name);
   }
 
+  const videoEl = document.getElementById("candidate-profile-video");
+  if (candidateIsTutor && profile.introVideo) {
+    videoEl.src = profile.introVideo;
+    videoEl.style.display = "block";
+  } else {
+    videoEl.removeAttribute("src");
+    videoEl.style.display = "none";
+  }
+
+  const extraRows = [];
+  if (candidateIsTutor) {
+    if (profile.rate) extraRows.push(["Rate", profile.rate]);
+    if (profile.tutoringHours) extraRows.push(["Tutoring Hours", `${profile.tutoringHours} hrs`]);
+  } else {
+    if (profile.offer) extraRows.push(["Offering to Pay", profile.offer]);
+    if ((profile.paymentMethods || []).length) extraRows.push(["Payment Methods", profile.paymentMethods.join(", ")]);
+  }
+  if (profile.music) extraRows.push(["Music", profile.music]);
+  if (profile.athletics) extraRows.push(["Athletics", profile.athletics]);
+
+  const extraSection = document.getElementById("candidate-profile-extra-section");
+  if (extraRows.length) {
+    extraSection.style.display = "block";
+    document.getElementById("candidate-profile-extra-label").textContent = "Details";
+    document.getElementById("candidate-profile-extra").innerHTML = extraRows
+      .map(
+        ([label, value]) => `
+        <div class="candidate-profile-extra-row">
+          <span class="candidate-profile-extra-label">${escapeHtml(label)}</span>
+          <span class="candidate-profile-extra-value">${escapeHtml(value)}</span>
+        </div>`
+      )
+      .join("");
+  } else {
+    extraSection.style.display = "none";
+  }
+
   const coursesEl = document.getElementById("candidate-profile-courses");
   coursesEl.innerHTML = profile.subjects.length
     ? profile.subjects.map((s) => `<span class="course-tag">${escapeHtml(s)}</span>`).join("")
@@ -669,7 +817,43 @@ function openCandidateProfileModal(user, profile, candidateIsTutor) {
     startChatWith(user.email);
   };
 
+  // Feedback: tutees can leave (and see) comments about a tutor.
+  const commentsSection = document.getElementById("candidate-profile-comments-section");
+  if (candidateIsTutor && me.role === "tutee") {
+    commentsSection.style.display = "block";
+    renderCandidateComments(user.email);
+    document.getElementById("candidate-comment-hint").textContent = "";
+    document.getElementById("candidate-comment-form").onsubmit = (e) => {
+      e.preventDefault();
+      const input = document.getElementById("candidate-comment-input");
+      const text = input.value.trim();
+      if (!text) return;
+      addComment(user.email, me.email, text);
+      input.value = "";
+      document.getElementById("candidate-comment-hint").textContent = "Thanks — this is shared with the program coordinator.";
+      renderCandidateComments(user.email);
+    };
+  } else {
+    commentsSection.style.display = "none";
+  }
+
   toggleModal("candidate-profile-modal", true);
+}
+
+function renderCandidateComments(tutorEmail) {
+  const comments = getVisibleCommentsForTutor(tutorEmail);
+  document.getElementById("candidate-profile-comments-list").innerHTML = comments.length
+    ? comments
+        .map(
+          (c) => `
+      <div class="tutor-comment-row">
+        <span class="tutor-comment-author">${escapeHtml(formatName(c.authorEmail))}</span>
+        <span class="tutor-comment-date">${formatDateTime(c.createdAt)}</span>
+        <p class="tutor-comment-text">${escapeHtml(c.text)}</p>
+      </div>`
+        )
+        .join("")
+    : `<p class="chat-list-empty">No feedback yet — be the first!</p>`;
 }
 
 function renderMatchingList() {
@@ -741,6 +925,7 @@ function renderMatchingList() {
       const subtitle = candidateSubtitle(profile, !isTutor);
       const existingChat = findChat(me.role === "tutor" ? me.email : u.email, me.role === "tutor" ? u.email : me.email);
       const accentColor = subjectColor(shared[0]);
+      const rateOrOffer = isTutor ? profile.offer : profile.rate;
       return `
         <div class="match-row" style="--accent-color:${accentColor}">
           <span class="chat-avatar" style="background:${colorForPerson(u.email)}">${initials(u.name)}</span>
@@ -748,6 +933,7 @@ function renderMatchingList() {
             <span class="match-row-name-line">
               <span class="new-chat-row-name">${escapeHtml(u.name)}</span>
               ${subtitle ? `<span class="match-row-subtitle">${escapeHtml(subtitle)}</span>` : ""}
+              ${rateOrOffer ? `<span class="match-rate-badge">${escapeHtml(rateOrOffer)}</span>` : ""}
             </span>
             <span class="match-subjects">${chipsHtml}</span>
           </span>

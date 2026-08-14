@@ -48,3 +48,34 @@ function requireSession(redirectTo) {
   }
   return session;
 }
+
+// Reads a video file into a data URL, checking file size up front and clip
+// length via its metadata — shared by the signup form's intro video upload
+// and the profile page's re-upload, both capped around 30-45 seconds.
+function readVideoWithChecks(file, { maxBytes = 20 * 1024 * 1024, minSeconds = 15, maxSeconds = 60 } = {}) {
+  return new Promise((resolve, reject) => {
+    if (file.size > maxBytes) {
+      reject(new Error(`That video is too big for this prototype (${Math.round(maxBytes / (1024 * 1024))}MB max).`));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      if (probe.duration < minSeconds || probe.duration > maxSeconds) {
+        reject(new Error(`That's a ${Math.round(probe.duration)}s clip — aim for 30-45 seconds.`));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Couldn't read that file."));
+      reader.readAsDataURL(file);
+    };
+    probe.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Couldn't read that video file."));
+    };
+    probe.src = url;
+  });
+}

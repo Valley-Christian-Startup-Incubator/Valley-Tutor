@@ -39,6 +39,88 @@ document.getElementById("forgot-password").addEventListener("click", () => {
   showSuccess("This is a local prototype, so password resets aren't wired up yet. Try creating a new account instead.");
 });
 
+// ---------------- Signup: photo + intro video uploads ----------------
+
+let signupPendingPhoto = "";
+let signupPendingVideo = "";
+
+const signupVideoField = document.getElementById("field-signup-video");
+function updateSignupVideoField() {
+  const role = document.querySelector('input[name="role"]:checked').value;
+  signupVideoField.style.display = role === "tutor" ? "block" : "none";
+  if (role !== "tutor") {
+    signupPendingVideo = "";
+    document.getElementById("signup-video-input").value = "";
+    document.getElementById("signup-video-error").textContent = "";
+  }
+}
+document.querySelectorAll('input[name="role"]').forEach((input) => {
+  input.addEventListener("change", updateSignupVideoField);
+});
+updateSignupVideoField();
+
+document.getElementById("signup-name").addEventListener("input", (e) => {
+  const initialsEl = document.getElementById("signup-avatar-preview-initials");
+  initialsEl.textContent = e.target.value.trim() ? initials(e.target.value.trim()) : "?";
+});
+
+function renderSignupAvatarPreview() {
+  const img = document.getElementById("signup-avatar-preview-img");
+  const initialsEl = document.getElementById("signup-avatar-preview-initials");
+  const removeBtn = document.getElementById("signup-avatar-remove-btn");
+  if (signupPendingPhoto) {
+    img.src = signupPendingPhoto;
+    img.style.display = "block";
+    initialsEl.style.display = "none";
+    removeBtn.style.display = "inline";
+  } else {
+    img.style.display = "none";
+    initialsEl.style.display = "flex";
+    removeBtn.style.display = "none";
+  }
+}
+
+document.getElementById("signup-avatar-upload-btn").addEventListener("click", () => {
+  document.getElementById("signup-avatar-input").click();
+});
+document.getElementById("signup-avatar-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const MAX_BYTES = 2 * 1024 * 1024;
+  if (file.size > MAX_BYTES) {
+    alert("That photo is too big for this prototype (2MB max). Try a smaller image.");
+    e.target.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    signupPendingPhoto = reader.result;
+    renderSignupAvatarPreview();
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
+});
+document.getElementById("signup-avatar-remove-btn").addEventListener("click", () => {
+  signupPendingPhoto = "";
+  renderSignupAvatarPreview();
+});
+
+document.getElementById("signup-video-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  const errorEl = document.getElementById("signup-video-error");
+  errorEl.textContent = "";
+  if (!file) return;
+
+  readVideoWithChecks(file)
+    .then((dataUrl) => {
+      signupPendingVideo = dataUrl;
+    })
+    .catch((err) => {
+      errorEl.textContent = err.message;
+      e.target.value = "";
+    });
+});
+
 function clearAlerts() {
   alertError.classList.remove("show");
   alertSuccess.classList.remove("show");
@@ -166,6 +248,13 @@ formSignup.addEventListener("submit", async (e) => {
   users.push(newUser);
   saveUsers(users);
   startSession(newUser);
+
+  if (signupPendingPhoto || signupPendingVideo) {
+    const profile = getProfile(email);
+    profile.photo = signupPendingPhoto;
+    if (role === "tutor") profile.introVideo = signupPendingVideo;
+    saveProfile(email, profile);
+  }
 
   showSuccess(`Account created! Welcome to Peer Tutoring, ${name.split(" ")[0]}.`);
   setTimeout(() => {
