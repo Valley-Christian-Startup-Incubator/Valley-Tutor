@@ -306,28 +306,32 @@ function getProfiles() {
   return readJSON(PROFILES_KEY, {});
 }
 
+// Merges the stored profile over these defaults (rather than only using
+// defaults when a profile is missing entirely) so an account saved before
+// some field existed — schema has grown a lot across iterations — still
+// gets a well-formed object instead of `undefined` where code expects an
+// array or string.
 function getProfile(email) {
-  return (
-    getProfiles()[email] || {
-      photo: "",
-      bio: "",
-      classYear: "",
-      takenCourses: [],
-      subjects: [],
-      gradeLevel: "",
-      gradeLevels: [],
-      availability: [],
-      availabilityLocations: {},
-      introVideo: "",
-      rate: "",
-      offer: "",
-      tutoringHours: "",
-      paymentMethods: [],
-      paymentHandle: "",
-      music: "",
-      athletics: "",
-    }
-  );
+  const defaults = {
+    photo: "",
+    bio: "",
+    classYear: "",
+    takenCourses: [],
+    subjects: [],
+    gradeLevel: "",
+    gradeLevels: [],
+    availability: [],
+    availabilityLocations: {},
+    introVideo: "",
+    rate: "",
+    offer: "",
+    tutoringHours: "",
+    paymentMethods: [],
+    paymentHandle: "",
+    music: "",
+    athletics: "",
+  };
+  return Object.assign({}, defaults, getProfiles()[email] || {});
 }
 
 function saveProfile(email, profile) {

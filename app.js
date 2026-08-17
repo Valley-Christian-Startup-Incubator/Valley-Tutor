@@ -22,9 +22,12 @@ if (me) {
 
   initTabs();
   initProfileTab();
-  initMatchingTab();
   initChatsTab();
-  if (me.role === "tutor") initScheduleTab();
+  if (me.role === "tutor") {
+    initScheduleTab();
+  } else {
+    initMatchingTab();
+  }
 
   onUpdate(() => {
     renderChatList();
@@ -33,8 +36,9 @@ if (me) {
     if (me.role === "tutor") {
       populateScheduleTuteeSelect();
       renderScheduleUpcoming();
+    } else {
+      renderMatchingList();
     }
-    renderMatchingList();
   });
 
   setInterval(renderSessions, 30000);
@@ -54,11 +58,22 @@ function initTabs() {
 
   if (me.role === "tutor") {
     tabs.schedule.style.display = "";
+  } else {
+    tabs.matching.style.display = "";
+  }
+
+  // Only tutees browse and choose — a tutor can't reach Matching, even via a
+  // stale ?tab= link, since they don't initiate chats.
+  function isTabAllowed(tab) {
+    if (tab === "schedule") return me.role === "tutor";
+    if (tab === "matching") return me.role === "tutee";
+    return true;
   }
 
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("tab");
-  const startTab = PANEL_NAMES.includes(requested) && (requested !== "schedule" || me.role === "tutor") ? requested : "matching";
+  const defaultTab = me.role === "tutor" ? "chats" : "matching";
+  const startTab = PANEL_NAMES.includes(requested) && isTabAllowed(requested) ? requested : defaultTab;
 
   function activate(which) {
     PANEL_NAMES.forEach((name) => {
@@ -73,7 +88,7 @@ function initTabs() {
       renderChatList();
       renderSessions();
       if (activeChatId) renderMessages(activeChatId);
-    } else if (which === "matching") {
+    } else if (which === "matching" && me.role === "tutee") {
       renderMatchingList();
     } else if (which === "schedule" && me.role === "tutor") {
       populateScheduleTuteeSelect();
@@ -549,6 +564,8 @@ function openLightbox(src) {
 // ---------------- Chats tab ----------------
 
 function initChatsTab() {
+  document.getElementById("chat-empty-text").textContent =
+    me.role === "tutee" ? "Select a chat to get going, or visit the Matching tab to start one." : "Select a chat to get going.";
   document.getElementById("schedule-btn").addEventListener("click", goToScheduleForActiveChat);
 
   document.getElementById("chat-composer").addEventListener("submit", handleSendMessage);
@@ -564,7 +581,10 @@ function renderChatList() {
   const list = document.getElementById("chat-list");
 
   if (chats.length === 0) {
-    list.innerHTML = `<p class="chat-list-empty">No chats yet. Start one with the + New button.</p>`;
+    list.innerHTML =
+      me.role === "tutee"
+        ? `<p class="chat-list-empty">No chats yet. Choose a tutor from the Matching tab to start one.</p>`
+        : `<p class="chat-list-empty">No chats yet. They'll show up here once a tutee chooses you.</p>`;
     return;
   }
 
@@ -706,15 +726,11 @@ function clearAttachment() {
   showAttachmentPreview();
 }
 
-// ---------------- Matching tab ----------------
+// ---------------- Matching tab (tutees only — they choose a tutor to start
+// chatting with, based on shared classes, availability, and rate; tutors
+// don't get a browsing/selecting view, only Chats) ----------------
 
 function initMatchingTab() {
-  const isTutor = me.role === "tutor";
-  document.getElementById("matching-heading").textContent = isTutor ? "Students Who Need What You Teach" : "Tutors For Your Classes";
-  document.getElementById("matching-lead").textContent = isTutor
-    ? "Ranked by how many of your classes they need help with."
-    : "Ranked by how many of your classes they can teach.";
-
   const deptFilter = document.getElementById("matching-department-filter");
   Object.keys(COURSE_CATALOG).forEach((category) => {
     deptFilter.innerHTML += `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`;
@@ -725,38 +741,44 @@ function initMatchingTab() {
   });
   deptFilter.addEventListener("change", renderMatchingList);
   availFilter.addEventListener("change", renderMatchingList);
+  document.getElementById("matching-sort-filter").addEventListener("change", renderMatchingList);
 
   document.getElementById("candidate-profile-close").addEventListener("click", () => toggleModal("candidate-profile-modal", false));
 
   renderMatchingList();
 }
 
-function candidateSubtitle(profile, candidateIsTutor) {
-  if (candidateIsTutor) {
-    return [profile.classYear, gradeRangeText(profile.gradeLevels)].filter(Boolean).join(" · ");
-  }
-  return profile.gradeLevel ? `${profile.gradeLevel} grade` : "";
+// Best-effort read of a free-text rate like "$20/hr" or "free during Warrior
+// Time" into a comparable number, for sorting only — not validated input.
+function parseRateValue(text) {
+  if (!text) return Infinity;
+  const match = text.match(/\d+(\.\d+)?/);
+  if (match) return parseFloat(match[0]);
+  return text.toLowerCase().includes("free") ? 0 : Infinity;
 }
 
-function startChatWith(theirEmail) {
+function candidateSubtitle(profile) {
+  return [profile.classYear, gradeRangeText(profile.gradeLevels)].filter(Boolean).join(" · ");
+}
+
+// Only a tutee calls this — they're the one choosing a tutor to chat with.
+function startChatWith(tutorEmail) {
   const myProfile = getProfile(me.email);
-  const theirProfile = getProfile(theirEmail);
-  const shared = myProfile.subjects.find((s) => theirProfile.subjects.includes(s));
-  const subject = shared || theirProfile.subjects[0] || myProfile.subjects[0] || "General tutoring";
-  const tutorEmail = me.role === "tutor" ? me.email : theirEmail;
-  const tuteeEmail = me.role === "tutor" ? theirEmail : me.email;
-  const chat = createChat(tutorEmail, tuteeEmail, subject);
+  const tutorProfile = getProfile(tutorEmail);
+  const shared = myProfile.subjects.find((s) => tutorProfile.subjects.includes(s));
+  const subject = shared || myProfile.subjects[0] || tutorProfile.subjects[0] || "General tutoring";
+  const chat = createChat(tutorEmail, me.email, subject);
   window.goToTab("chats");
   openChat(chat.id);
 }
 
-function openCandidateProfileModal(user, profile, candidateIsTutor) {
+// `user`/`profile` are always a tutor's — this modal only opens from a
+// tutee's Matching tab.
+function openCandidateProfileModal(user, profile) {
   document.getElementById("candidate-profile-name").textContent = user.name;
-  document.getElementById("candidate-profile-subtitle").textContent = candidateSubtitle(profile, candidateIsTutor);
+  document.getElementById("candidate-profile-subtitle").textContent = candidateSubtitle(profile);
   document.getElementById("candidate-profile-bio").textContent = profile.bio || "No bio yet.";
-  document.getElementById("candidate-profile-courses-label").textContent = candidateIsTutor
-    ? "Classes They Can Teach"
-    : "Classes They Need Help With";
+  document.getElementById("candidate-profile-courses-label").textContent = "Classes They Can Teach";
 
   const avatarImg = document.getElementById("candidate-profile-avatar-img");
   const avatarInitials = document.getElementById("candidate-profile-avatar-initials");
@@ -771,7 +793,7 @@ function openCandidateProfileModal(user, profile, candidateIsTutor) {
   }
 
   const videoEl = document.getElementById("candidate-profile-video");
-  if (candidateIsTutor && profile.introVideo) {
+  if (profile.introVideo) {
     videoEl.src = profile.introVideo;
     videoEl.style.display = "block";
   } else {
@@ -780,13 +802,8 @@ function openCandidateProfileModal(user, profile, candidateIsTutor) {
   }
 
   const extraRows = [];
-  if (candidateIsTutor) {
-    if (profile.rate) extraRows.push(["Rate", profile.rate]);
-    if (profile.tutoringHours) extraRows.push(["Tutoring Hours", `${profile.tutoringHours} hrs`]);
-  } else {
-    if (profile.offer) extraRows.push(["Offering to Pay", profile.offer]);
-    if ((profile.paymentMethods || []).length) extraRows.push(["Payment Methods", profile.paymentMethods.join(", ")]);
-  }
+  if (profile.rate) extraRows.push(["Rate", profile.rate]);
+  if (profile.tutoringHours) extraRows.push(["Tutoring Hours", `${profile.tutoringHours} hrs`]);
   if (profile.music) extraRows.push(["Music", profile.music]);
   if (profile.athletics) extraRows.push(["Athletics", profile.athletics]);
 
@@ -818,24 +835,18 @@ function openCandidateProfileModal(user, profile, candidateIsTutor) {
   };
 
   // Feedback: tutees can leave (and see) comments about a tutor.
-  const commentsSection = document.getElementById("candidate-profile-comments-section");
-  if (candidateIsTutor && me.role === "tutee") {
-    commentsSection.style.display = "block";
+  renderCandidateComments(user.email);
+  document.getElementById("candidate-comment-hint").textContent = "";
+  document.getElementById("candidate-comment-form").onsubmit = (e) => {
+    e.preventDefault();
+    const input = document.getElementById("candidate-comment-input");
+    const text = input.value.trim();
+    if (!text) return;
+    addComment(user.email, me.email, text);
+    input.value = "";
+    document.getElementById("candidate-comment-hint").textContent = "Thanks — this is shared with the program coordinator.";
     renderCandidateComments(user.email);
-    document.getElementById("candidate-comment-hint").textContent = "";
-    document.getElementById("candidate-comment-form").onsubmit = (e) => {
-      e.preventDefault();
-      const input = document.getElementById("candidate-comment-input");
-      const text = input.value.trim();
-      if (!text) return;
-      addComment(user.email, me.email, text);
-      input.value = "";
-      document.getElementById("candidate-comment-hint").textContent = "Thanks — this is shared with the program coordinator.";
-      renderCandidateComments(user.email);
-    };
-  } else {
-    commentsSection.style.display = "none";
-  }
+  };
 
   toggleModal("candidate-profile-modal", true);
 }
@@ -859,52 +870,56 @@ function renderCandidateComments(tutorEmail) {
 function renderMatchingList() {
   const listEl = document.getElementById("matching-list");
   const legendEl = document.getElementById("matching-legend-text");
-  if (!listEl) return;
+  if (!listEl || me.role !== "tutee") return;
 
-  const isTutor = me.role === "tutor";
-  const oppositeRole = isTutor ? "tutee" : "tutor";
-  const candidates = getUsers().filter((u) => u.role === oppositeRole && u.email !== me.email);
+  const tutors = getUsers().filter((u) => u.role === "tutor");
   const myProfile = getProfile(me.email);
 
-  // Only candidates where the tutor is qualified to teach at least one class
-  // the tutee needs — i.e. the two "classes taken/can teach" and "classes
-  // need help with" lists actually overlap.
-  const matched = candidates
+  // Only tutors qualified to teach at least one class this tutee needs — the
+  // tutee's "classes need help with" and the tutor's "classes can teach"
+  // lists actually overlap.
+  const matched = tutors
     .map((u) => {
       const profile = getProfile(u.email);
       const shared = myProfile.subjects.filter((s) => profile.subjects.includes(s));
       return { user: u, profile, shared };
     })
-    .filter((m) => m.shared.length > 0)
-    .sort((a, b) => b.shared.length - a.shared.length);
+    .filter((m) => m.shared.length > 0);
 
   const deptValue = document.getElementById("matching-department-filter").value;
   const availValue = document.getElementById("matching-availability-filter").value;
+  const sortValue = document.getElementById("matching-sort-filter").value;
   const filtered = matched.filter((m) => {
     const deptOk = !deptValue || m.shared.some((label) => categoryForLabel(label) === deptValue);
     const availOk = !availValue || m.profile.availability.some((a) => a.endsWith(availValue));
     return deptOk && availOk;
   });
 
-  legendEl.textContent = `A filled sky chip means you both have that exact class. ${filtered.length} ${
-    oppositeRole
-  }${filtered.length === 1 ? "" : "s"} match right now.`;
+  if (sortValue === "rate") {
+    filtered.sort((a, b) => parseRateValue(a.profile.rate) - parseRateValue(b.profile.rate));
+  } else if (sortValue === "hours") {
+    filtered.sort((a, b) => (parseFloat(b.profile.tutoringHours) || 0) - (parseFloat(a.profile.tutoringHours) || 0));
+  } else {
+    filtered.sort((a, b) => b.shared.length - a.shared.length);
+  }
+
+  legendEl.textContent = `A filled sky chip means you both have that exact class. ${filtered.length} tutor${
+    filtered.length === 1 ? "" : "s"
+  } match right now.`;
 
   const departmentCount = new Set(myProfile.subjects.map(categoryForLabel).filter(Boolean)).size;
   document.getElementById("matching-stats").innerHTML = `
     <div class="matching-stat"><span class="matching-stat-num">${matched.length}</span><span class="matching-stat-label">Matches</span></div>
-    <div class="matching-stat"><span class="matching-stat-num">${myProfile.subjects.length}</span><span class="matching-stat-label">${
-    isTutor ? "Classes You Teach" : "Classes You Need"
-  }</span></div>
+    <div class="matching-stat"><span class="matching-stat-num">${myProfile.subjects.length}</span><span class="matching-stat-label">Classes You Need</span></div>
     <div class="matching-stat"><span class="matching-stat-num">${departmentCount}</span><span class="matching-stat-label">Departments</span></div>
   `;
 
-  if (candidates.length === 0) {
-    listEl.innerHTML = `<p class="chat-list-empty">No ${oppositeRole}s have signed up yet. Check back soon.</p>`;
+  if (tutors.length === 0) {
+    listEl.innerHTML = `<p class="chat-list-empty">No tutors have signed up yet. Check back soon.</p>`;
     return;
   }
   if (matched.length === 0) {
-    listEl.innerHTML = `<p class="chat-list-empty">No ${oppositeRole}s share any of your classes yet. Update your classes on your profile, or check back soon.</p>`;
+    listEl.innerHTML = `<p class="chat-list-empty">No tutors share any of your classes yet. Update your classes on your profile, or check back soon.</p>`;
     return;
   }
   if (filtered.length === 0) {
@@ -922,10 +937,9 @@ function renderMatchingList() {
             )}</span>`
         )
         .join("");
-      const subtitle = candidateSubtitle(profile, !isTutor);
-      const existingChat = findChat(me.role === "tutor" ? me.email : u.email, me.role === "tutor" ? u.email : me.email);
+      const subtitle = candidateSubtitle(profile);
+      const existingChat = findChat(u.email, me.email);
       const accentColor = subjectColor(shared[0]);
-      const rateOrOffer = isTutor ? profile.offer : profile.rate;
       return `
         <div class="match-row" style="--accent-color:${accentColor}">
           <span class="chat-avatar" style="background:${colorForPerson(u.email)}">${initials(u.name)}</span>
@@ -933,7 +947,7 @@ function renderMatchingList() {
             <span class="match-row-name-line">
               <span class="new-chat-row-name">${escapeHtml(u.name)}</span>
               ${subtitle ? `<span class="match-row-subtitle">${escapeHtml(subtitle)}</span>` : ""}
-              ${rateOrOffer ? `<span class="match-rate-badge">${escapeHtml(rateOrOffer)}</span>` : ""}
+              ${profile.rate ? `<span class="match-rate-badge">${escapeHtml(profile.rate)}</span>` : ""}
             </span>
             <span class="match-subjects">${chipsHtml}</span>
           </span>
@@ -960,7 +974,7 @@ function renderMatchingList() {
   listEl.querySelectorAll(".match-view-profile").forEach((btn) => {
     btn.addEventListener("click", () => {
       const match = filtered.find((m) => m.user.email === btn.dataset.email);
-      if (match) openCandidateProfileModal(match.user, match.profile, !isTutor);
+      if (match) openCandidateProfileModal(match.user, match.profile);
     });
   });
 }

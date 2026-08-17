@@ -23,7 +23,7 @@
 </header>
 
 <nav class="app-tabs" role="tablist">
-  <button class="app-tab active" id="tab-matching" role="tab" aria-selected="true">Matching</button>
+  <button class="app-tab" id="tab-matching" role="tab" aria-selected="false" style="display:none;">Matching</button>
   <button class="app-tab" id="tab-chats" role="tab" aria-selected="false">Chats</button>
   <button class="app-tab" id="tab-schedule" role="tab" aria-selected="false" style="display:none;">Schedule</button>
 </nav>
@@ -185,8 +185,8 @@
       <div class="matching-hero">
         <div class="matching-hero-top">
           <div>
-            <h1 id="matching-heading">Find a Match</h1>
-            <p class="matching-hero-lead" id="matching-lead">Ranked by how many of your classes overlap.</p>
+            <h1 id="matching-heading">Find a Tutor</h1>
+            <p class="matching-hero-lead" id="matching-lead">Filter and sort by class, availability, and rate — you choose who to chat with.</p>
           </div>
           <div class="matching-filters">
             <select id="matching-department-filter">
@@ -194,6 +194,11 @@
             </select>
             <select id="matching-availability-filter">
               <option value="">Any availability</option>
+            </select>
+            <select id="matching-sort-filter">
+              <option value="shared">Most classes shared</option>
+              <option value="rate">Lowest rate first</option>
+              <option value="hours">Most experience</option>
             </select>
           </div>
         </div>
@@ -222,7 +227,7 @@
 
       <section class="chat-thread-col">
         <div id="chat-empty" class="chat-empty">
-          <p>Select a chat to get going, or visit the Matching tab to start one.</p>
+          <p id="chat-empty-text">Select a chat to get going.</p>
         </div>
         <div id="chat-active" class="chat-active" style="display:none;">
           <div class="chat-thread-head" id="chat-thread-head">
@@ -338,7 +343,7 @@
 
       <button type="button" class="btn-primary" id="candidate-profile-chat-btn" style="max-width:none;">Start Chat</button>
 
-      <div class="candidate-profile-section" id="candidate-profile-comments-section" style="display:none;">
+      <div class="candidate-profile-section" id="candidate-profile-comments-section">
         <h4>Feedback</h4>
         <div id="candidate-profile-comments-list"></div>
         <form id="candidate-comment-form">
