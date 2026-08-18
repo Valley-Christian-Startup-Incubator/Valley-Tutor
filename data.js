@@ -87,6 +87,42 @@ const COURSE_CATALOG = {
     { name: "Spanish II", levels: ["Regular"] },
     { name: "Spanish III", levels: ["Regular"] },
   ],
+  // Not academic courses, but folded into the same "classes you've taken /
+  // need help with" picker at the coordinator's request rather than kept as
+  // separate free-text fields — same matching mechanics apply. Every entry
+  // is single-level since "Regular/Honors/AP" doesn't mean anything here.
+  Music: [
+    { name: "Piano", levels: ["Regular"] },
+    { name: "Guitar", levels: ["Regular"] },
+    { name: "Bass Guitar", levels: ["Regular"] },
+    { name: "Violin", levels: ["Regular"] },
+    { name: "Viola", levels: ["Regular"] },
+    { name: "Cello", levels: ["Regular"] },
+    { name: "Drums", levels: ["Regular"] },
+    { name: "Flute", levels: ["Regular"] },
+    { name: "Clarinet", levels: ["Regular"] },
+    { name: "Saxophone", levels: ["Regular"] },
+    { name: "Trumpet", levels: ["Regular"] },
+    { name: "Trombone", levels: ["Regular"] },
+    { name: "Voice (Singing)", levels: ["Regular"] },
+    { name: "Ukulele", levels: ["Regular"] },
+  ],
+  Athletics: [
+    { name: "Basketball", levels: ["Regular"] },
+    { name: "Soccer", levels: ["Regular"] },
+    { name: "Volleyball", levels: ["Regular"] },
+    { name: "Tennis", levels: ["Regular"] },
+    { name: "Track & Field", levels: ["Regular"] },
+    { name: "Cross Country", levels: ["Regular"] },
+    { name: "Swimming", levels: ["Regular"] },
+    { name: "Baseball", levels: ["Regular"] },
+    { name: "Softball", levels: ["Regular"] },
+    { name: "Football", levels: ["Regular"] },
+    { name: "Golf", levels: ["Regular"] },
+    { name: "Wrestling", levels: ["Regular"] },
+    { name: "Water Polo", levels: ["Regular"] },
+    { name: "Lacrosse", levels: ["Regular"] },
+  ],
 };
 
 const CATEGORY_COLORS = {
@@ -95,6 +131,8 @@ const CATEGORY_COLORS = {
   Science: "#4c9a5b",
   "Social Sciences": "#a13b52",
   "World Language": "#d98a34",
+  Music: "#c2477a",
+  Athletics: "#3b7dbf",
 };
 
 function findCatalogCourse(course) {
@@ -328,8 +366,6 @@ function getProfile(email) {
     tutoringHours: "",
     paymentMethods: [],
     paymentHandle: "",
-    music: "",
-    athletics: "",
   };
   return Object.assign({}, defaults, getProfiles()[email] || {});
 }

@@ -220,7 +220,7 @@ function initProfileTab() {
     ).join("");
   }
 
-  // ---- Details card: video/rate/hours (tutor), offer/payment (tutee), music/athletics (both) ----
+  // ---- Details card: video/rate/hours (tutor), offer/payment (tutee) ----
   document.getElementById("intro-video-field").style.display = isTutor ? "" : "none";
   document.getElementById("rate-field").style.display = isTutor ? "" : "none";
   document.getElementById("tutoring-hours-field").style.display = isTutor ? "" : "none";
@@ -268,8 +268,6 @@ function initProfileTab() {
   document.getElementById("rate-input").value = profile.rate || "";
   document.getElementById("tutoring-hours-input").value = profile.tutoringHours || "";
   document.getElementById("offer-input").value = profile.offer || "";
-  document.getElementById("music-input").value = profile.music || "";
-  document.getElementById("athletics-input").value = profile.athletics || "";
   document.getElementById("payment-handle-input").value = profile.paymentHandle || "";
 
   document.getElementById("payment-methods-grid").innerHTML = PAYMENT_METHODS.map(
@@ -320,7 +318,7 @@ function initProfileTab() {
   document.getElementById("course-browser-lead").textContent = isTutor
     ? "Pick every course you have finished. We work out what that qualifies you to teach — you never guess."
     : "Pick every course you'd like a tutor's help with.";
-  document.getElementById("course-search-input").placeholder = `Search ${totalCatalogCourseCount()} courses — try "span" or "AP"`;
+  document.getElementById("course-search-input").placeholder = `Search ${totalCatalogCourseCount()} classes — try "guitar" or "AP"`;
 
   function isCourseSelected(course, level) {
     return isTutor
@@ -528,8 +526,6 @@ function initProfileTab() {
         ? []
         : Array.from(document.querySelectorAll('input[name="paymentMethod"]:checked')).map((i) => i.value),
       paymentHandle: isTutor ? "" : document.getElementById("payment-handle-input").value.trim(),
-      music: document.getElementById("music-input").value.trim(),
-      athletics: document.getElementById("athletics-input").value.trim(),
     };
     if (isTutor) {
       newProfile.gradeLevels = Array.from(document.querySelectorAll('input[name="grade"]:checked')).map((i) => i.value);
@@ -804,8 +800,6 @@ function openCandidateProfileModal(user, profile) {
   const extraRows = [];
   if (profile.rate) extraRows.push(["Rate", profile.rate]);
   if (profile.tutoringHours) extraRows.push(["Tutoring Hours", `${profile.tutoringHours} hrs`]);
-  if (profile.music) extraRows.push(["Music", profile.music]);
-  if (profile.athletics) extraRows.push(["Athletics", profile.athletics]);
 
   const extraSection = document.getElementById("candidate-profile-extra-section");
   if (extraRows.length) {
