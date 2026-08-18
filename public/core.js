@@ -43,7 +43,7 @@ function clearSession() {
 function requireSession(redirectTo) {
   const session = getSession();
   if (!session) {
-    window.location.href = redirectTo || "login.html";
+    window.location.href = redirectTo || "/login";
     return null;
   }
   return session;

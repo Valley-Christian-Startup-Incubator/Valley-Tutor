@@ -187,7 +187,7 @@ formLogin.addEventListener("submit", async (e) => {
   startSession(user);
   showSuccess(`Welcome back, ${user.name.split(" ")[0]}! Taking you to your dashboard…`);
   setTimeout(() => {
-    window.location.href = "app.html";
+    window.location.href = "/app";
   }, 700);
 });
 
@@ -258,13 +258,13 @@ formSignup.addEventListener("submit", async (e) => {
 
   showSuccess(`Account created! Welcome to Peer Tutoring, ${name.split(" ")[0]}.`);
   setTimeout(() => {
-    window.location.href = "app.html";
+    window.location.href = "/app";
   }, 700);
 });
 
 (function redirectIfLoggedIn() {
   if (getSession()) {
-    window.location.href = "app.html";
+    window.location.href = "/app";
   }
 })();
 
