@@ -4,7 +4,7 @@ const PERSON_COLORS = ["#2b6cb0", "#9f7aea", "#38a169", "#dd6b20", "#d53f8c", "#
 let activeChatId = null;
 let pendingAttachment = null;
 
-const me = requireSession("login.html");
+const me = requireSession("/login");
 
 if (me) {
   document.getElementById("me-name").textContent = me.name;
@@ -13,7 +13,7 @@ if (me) {
 
   document.getElementById("logout-btn").addEventListener("click", () => {
     clearSession();
-    window.location.href = "index.html";
+    window.location.href = "/";
   });
   document.getElementById("lightbox-close").addEventListener("click", () => toggleModal("image-lightbox", false));
   document.getElementById("image-lightbox").addEventListener("click", (e) => {
@@ -1115,7 +1115,7 @@ function sessionListHtml(sessions) {
 function wireSessionJoinButtons(container) {
   container.querySelectorAll(".session-join").forEach((btn) => {
     btn.addEventListener("click", () => {
-      window.location.href = `video.html?session=${btn.dataset.sessionId}`;
+      window.location.href = `/video?session=${btn.dataset.sessionId}`;
     });
   });
 }

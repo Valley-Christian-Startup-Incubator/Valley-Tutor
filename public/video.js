@@ -1,4 +1,4 @@
-const me = requireSession("login.html");
+const me = requireSession("/login");
 
 if (me) {
   init();
@@ -171,7 +171,7 @@ async function init() {
     callChannel.postMessage({ type: "leave" });
     localStream.getTracks().forEach((t) => t.stop());
     pc.close();
-    window.location.href = "app.html?tab=chats";
+    window.location.href = "/app?tab=chats";
   }
 
   leaveBtn.addEventListener("click", leave);
