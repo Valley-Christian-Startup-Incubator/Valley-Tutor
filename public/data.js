@@ -316,9 +316,11 @@ const GRADE_LEVELS = ["6th", "7th", "8th", "9th", "10th", "11th", "12th"];
 const CLASS_YEARS = ["Freshman", "Sophomore", "Junior", "Senior"];
 const AVAILABILITY_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const AVAILABILITY_BLOCKS = ["Before School", "Warrior Time", "After School", "Evening"];
-// Evening is Zoom-only (no location to collect); the rest happen on campus,
-// where the tutor/tutee picks a specific location (library, room number...).
+// Evening defaults to Zoom-only (no location to collect); the rest default to
+// on-campus. Both are just defaults now — tutors/tutees can override the
+// format per block via profile.availabilityFormats (see AVAILABILITY_FORMATS).
 const ZOOM_ONLY_BLOCKS = ["Evening"];
+const AVAILABILITY_FORMATS = ["In-Person", "Online", "Both"];
 
 const PAYMENT_METHODS = ["Venmo", "Zelle", "PayPal", "Cash"];
 
@@ -360,6 +362,7 @@ function getProfile(email) {
     gradeLevels: [],
     availability: [],
     availabilityLocations: {},
+    availabilityFormats: {},
     introVideo: "",
     rate: "",
     offer: "",
@@ -404,6 +407,7 @@ function createChat(tutorEmail, tuteeEmail, subject) {
     tutorEmail,
     tuteeEmail,
     subject: subject || "",
+    agreedRate: "",
     createdAt: new Date().toISOString(),
   };
   chats.push(chat);
@@ -414,6 +418,19 @@ function createChat(tutorEmail, tuteeEmail, subject) {
 
 function otherPartyEmail(chat, myEmail) {
   return chat.tutorEmail === myEmail ? chat.tuteeEmail : chat.tutorEmail;
+}
+
+// The hourly rate a tutor and tutee land on for this relationship, recorded
+// on the chat itself (rather than only in a one-off message) so either side
+// can look it up later without scrolling back through history.
+function setChatAgreedRate(chatId, rate) {
+  const chats = getChats();
+  const idx = chats.findIndex((c) => c.id === chatId);
+  if (idx === -1) return null;
+  chats[idx] = { ...chats[idx], agreedRate: rate || "" };
+  writeJSON(CHATS_KEY, chats);
+  notifyUpdate("chat");
+  return chats[idx];
 }
 
 // ---------- Messages ----------
@@ -445,6 +462,31 @@ function addMessage(chatId, sender, text, attachment, system) {
   return message;
 }
 
+// ---------- Read state (unread-message badges) ----------
+// Per-user, per-chat "last read" timestamps, so the Chats tab and chat list
+// can show an unread indicator without a real backend read-receipt system.
+
+const READ_STATE_KEY = "wc_read_state";
+
+function getReadState() {
+  return readJSON(READ_STATE_KEY, {});
+}
+
+function markChatRead(email, chatId) {
+  const state = getReadState();
+  if (!state[email]) state[email] = {};
+  state[email][chatId] = new Date().toISOString();
+  writeJSON(READ_STATE_KEY, state);
+}
+
+function getUnreadCountForChat(email, chatId) {
+  const state = getReadState();
+  const lastRead = state[email] && state[email][chatId];
+  return getMessagesForChat(chatId).filter(
+    (m) => !m.system && m.sender !== email && (!lastRead || new Date(m.timestamp) > new Date(lastRead))
+  ).length;
+}
+
 // ---------- Sessions ----------
 
 function getSessions() {
@@ -472,12 +514,42 @@ function createSession({ chatId, tutorEmail, tuteeEmail, subject, datetime, dura
     datetime,
     durationMinutes: Number(durationMinutes) || 30,
     zoomLink: zoomLink || "",
+    status: "scheduled",
     createdAt: new Date().toISOString(),
   };
   sessions.push(session);
   writeJSON(SESSIONS_KEY, sessions);
   notifyUpdate("session");
   return session;
+}
+
+// Cancellation is a status flip, not a delete — a cancelled session stays
+// visible (marked as such) instead of vanishing, so both sides retain a
+// record of it. `cancelledByEmail` drives the "cancelled by you" vs.
+// "cancelled by <name>" distinction in the UI.
+function cancelSession(sessionId, cancelledByEmail) {
+  const sessions = getSessions();
+  const idx = sessions.findIndex((s) => s.id === sessionId);
+  if (idx === -1) return null;
+  sessions[idx] = {
+    ...sessions[idx],
+    status: "cancelled",
+    cancelledBy: cancelledByEmail,
+    cancelledAt: new Date().toISOString(),
+  };
+  writeJSON(SESSIONS_KEY, sessions);
+  notifyUpdate("session");
+  return sessions[idx];
+}
+
+function updateSessionZoomLink(sessionId, zoomLink) {
+  const sessions = getSessions();
+  const idx = sessions.findIndex((s) => s.id === sessionId);
+  if (idx === -1) return null;
+  sessions[idx] = { ...sessions[idx], zoomLink: zoomLink || "" };
+  writeJSON(SESSIONS_KEY, sessions);
+  notifyUpdate("session");
+  return sessions[idx];
 }
 
 // ---------- Comments (tutee feedback on tutors) ----------
@@ -562,7 +634,7 @@ function onUpdate(callback) {
     wcChannel.onmessage = (e) => callback(e.data.type);
   }
   window.addEventListener("storage", (e) => {
-    if ([PROFILES_KEY, CHATS_KEY, MESSAGES_KEY, SESSIONS_KEY, COMMENTS_KEY].includes(e.key)) {
+    if ([PROFILES_KEY, CHATS_KEY, MESSAGES_KEY, SESSIONS_KEY, COMMENTS_KEY, READ_STATE_KEY].includes(e.key)) {
       callback("storage");
     }
   });

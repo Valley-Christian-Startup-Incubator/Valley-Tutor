@@ -67,10 +67,10 @@ The diagram shows one pass through, but nothing is one-shot: a student can keep 
 - `/` — marketing landing page
 - `/login` — log in / sign up (supports `?tab=signup` to open directly on the sign-up tab)
 - `/app` — the main app, with role-gated tabs:
-  - **Profile** (opened via the header avatar, not a nav tab) — photo, bio, class/grade, availability, and a searchable "classes taken / classes need help with" picker
+  - **Profile** (opened via the header avatar, not a nav tab) — photo, bio, class/grade, availability (with a per-block In-Person/Online/Both format, not just a hardcoded Zoom-only evening), and a searchable "classes taken / classes need help with" picker
   - **Matching** (tutees only — they're the ones who choose a tutor) — browse tutors, filter by department/availability, sort by shared classes/rate/experience, and start a chat
-  - **Chats** — message threads with file sharing, plus an "Upcoming Sessions" sidebar (countdowns, a "Join Video Call" button once a session's time has come, and an "Open Zoom Instead" fallback link when the tutor set one)
-  - **Schedule** (tutors only) — schedule a new session with a matched tutee, with an optional Zoom link as a fallback
+  - **Chats** — message threads with file sharing and unread badges, an agreed-hourly-rate field in the thread header either side can set (recorded on the chat for later lookup, with a system message for the audit trail), plus an "Upcoming Sessions" sidebar (countdowns, a "Join Video Call" button once a session's time has come, a Zoom link with copy/edit actions, and a "Cancel Session" action that notifies the other person via a system message in the chat)
+  - **Schedule** (tutors only) — schedule a new session with a matched tutee, with an optional Zoom link as a fallback (validated, and editable afterward from the session card)
 - `/video` — the embedded video call (WebRTC via `RTCPeerConnection`, signaled over `BroadcastChannel` for same-browser demo purposes). If the camera/mic can't be accessed, or the call can't connect within 25s, it offers the session's Zoom link as a fallback instead.
 
 ## Project structure

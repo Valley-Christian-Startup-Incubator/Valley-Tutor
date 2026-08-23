@@ -30,6 +30,11 @@ if (me) {
   }
 
   onUpdate(() => {
+    if (activeChatId) {
+      markChatRead(me.email, activeChatId);
+      const activeChat = getChatById(activeChatId);
+      if (activeChat) renderAgreedRate(activeChat);
+    }
     renderChatList();
     if (activeChatId) renderMessages(activeChatId);
     renderSessions();
@@ -473,48 +478,83 @@ function initProfileTab() {
 
   renderCourseBrowser();
 
-  const availabilityGrid = document.getElementById("availability-grid");
-  let availHtml = `<div class="avail-corner"></div>`;
-  AVAILABILITY_BLOCKS.forEach(
-    (b) => (availHtml += `<div class="avail-block-label">${escapeHtml(b)}<br />${ZOOM_ONLY_BLOCKS.includes(b) ? "(Zoom)" : "(on campus)"}</div>`)
-  );
-  AVAILABILITY_DAYS.forEach((day) => {
-    availHtml += `<div class="avail-day-label">${day}</div>`;
-    AVAILABILITY_BLOCKS.forEach((block) => {
-      const token = `${day}-${block}`;
-      availHtml += `
-        <label class="avail-cell">
-          <input type="checkbox" name="availability" value="${token}" ${profile.availability.includes(token) ? "checked" : ""} />
-          <span></span>
-        </label>`;
-    });
+  // Format-specific availability: each block defaults to the old hardcoded
+  // assumption (Evening = Online, everything else = In-Person) for profiles
+  // saved before this existed, but is now editable per block.
+  const pendingAvailFormats = {};
+  AVAILABILITY_BLOCKS.forEach((b) => {
+    pendingAvailFormats[b] = (profile.availabilityFormats || {})[b] || (ZOOM_ONLY_BLOCKS.includes(b) ? "Online" : "In-Person");
   });
-  availabilityGrid.innerHTML = availHtml;
+
+  function renderAvailabilityGrid() {
+    const availabilityGrid = document.getElementById("availability-grid");
+    let availHtml = `<div class="avail-corner"></div>`;
+    AVAILABILITY_BLOCKS.forEach((b) => {
+      const fmt = pendingAvailFormats[b];
+      const fmtText = fmt === "Both" ? "In-Person & Online" : fmt === "Online" ? "Online" : "In-Person";
+      availHtml += `<div class="avail-block-label">${escapeHtml(b)}<br />(${fmtText})</div>`;
+    });
+    AVAILABILITY_DAYS.forEach((day) => {
+      availHtml += `<div class="avail-day-label">${day}</div>`;
+      AVAILABILITY_BLOCKS.forEach((block) => {
+        const token = `${day}-${block}`;
+        availHtml += `
+          <label class="avail-cell">
+            <input type="checkbox" name="availability" value="${token}" ${profile.availability.includes(token) ? "checked" : ""} />
+            <span></span>
+          </label>`;
+      });
+    });
+    availabilityGrid.innerHTML = availHtml;
+  }
 
   const availLocations = profile.availabilityLocations || {};
-  document.getElementById("avail-locations").innerHTML =
-    `<div class="avail-location-corner"></div>` +
-    AVAILABILITY_BLOCKS.map((block) => {
-      const isZoom = ZOOM_ONLY_BLOCKS.includes(block);
-      return `
-        <div class="avail-location-field">
-          <label>Location</label>
-          <input type="text" data-block="${escapeHtml(block)}" ${isZoom ? "value=\"Zoom\" disabled" : `value="${escapeHtml(availLocations[block] || "")}" placeholder="e.g. Library"`} />
-        </div>`;
-    }).join("");
+  function renderAvailLocations() {
+    document.getElementById("avail-locations").innerHTML =
+      `<div class="avail-location-corner"></div>` +
+      AVAILABILITY_BLOCKS.map((block) => {
+        const fmt = pendingAvailFormats[block];
+        const showLocation = fmt !== "Online";
+        return `
+          <div class="avail-location-field">
+            <label>Format</label>
+            <select data-format-block="${escapeHtml(block)}">
+              ${AVAILABILITY_FORMATS.map((f) => `<option value="${f}" ${fmt === f ? "selected" : ""}>${f}</option>`).join("")}
+            </select>
+            ${
+              showLocation
+                ? `<input type="text" data-block="${escapeHtml(block)}" value="${escapeHtml(availLocations[block] || "")}" placeholder="e.g. Library" />`
+                : ""
+            }
+          </div>`;
+      }).join("");
+
+    document.querySelectorAll('#avail-locations select[data-format-block]').forEach((select) => {
+      select.addEventListener("change", () => {
+        pendingAvailFormats[select.dataset.formatBlock] = select.value;
+        renderAvailLocations();
+        renderAvailabilityGrid();
+      });
+    });
+  }
+
+  renderAvailabilityGrid();
+  renderAvailLocations();
 
   document.getElementById("profile-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const availability = Array.from(document.querySelectorAll('input[name="availability"]:checked')).map((i) => i.value);
     const availabilityLocations = {};
-    document.querySelectorAll("#avail-locations input[data-block]").forEach((input) => {
-      availabilityLocations[input.dataset.block] = input.disabled ? "Zoom" : input.value.trim();
+    AVAILABILITY_BLOCKS.forEach((block) => {
+      const input = document.querySelector(`#avail-locations input[data-block="${block}"]`);
+      availabilityLocations[block] = input ? input.value.trim() : "";
     });
     const subjects = isTutor ? getTeachableCourses(pendingTakenCourses).map((c) => c.label) : Array.from(pendingSubjects);
     const newProfile = {
       subjects,
       availability,
       availabilityLocations,
+      availabilityFormats: pendingAvailFormats,
       photo: pendingPhoto,
       bio: document.getElementById("bio-input").value.trim(),
       takenCourses: isTutor ? pendingTakenCourses.slice() : [],
@@ -568,8 +608,40 @@ function initChatsTab() {
   document.getElementById("attach-btn").addEventListener("click", () => document.getElementById("file-input").click());
   document.getElementById("file-input").addEventListener("change", handleFileSelect);
 
+  document.getElementById("chat-agreed-rate-btn").addEventListener("click", () => {
+    if (!activeChatId) return;
+    const chat = getChatById(activeChatId);
+    document.getElementById("chat-agreed-rate-input").value = (chat && chat.agreedRate) || "";
+    document.getElementById("chat-agreed-rate").style.display = "none";
+    document.getElementById("chat-agreed-rate-form").style.display = "flex";
+    document.getElementById("chat-agreed-rate-input").focus();
+  });
+  document.getElementById("chat-agreed-rate-cancel").addEventListener("click", () => {
+    const chat = getChatById(activeChatId);
+    if (chat) renderAgreedRate(chat);
+  });
+  document.getElementById("chat-agreed-rate-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!activeChatId) return;
+    const rate = document.getElementById("chat-agreed-rate-input").value.trim();
+    const chat = setChatAgreedRate(activeChatId, rate);
+    addMessage(activeChatId, me.email, rate ? `Agreed hourly rate set to ${rate}.` : "Agreed hourly rate cleared.", null, true);
+    renderAgreedRate(chat);
+    renderMessages(activeChatId);
+    renderChatList();
+  });
+
   renderChatList();
   renderSessions();
+}
+
+function renderAgreedRate(chat) {
+  const textEl = document.getElementById("chat-agreed-rate-text");
+  const btn = document.getElementById("chat-agreed-rate-btn");
+  textEl.textContent = chat.agreedRate ? `Agreed rate: ${chat.agreedRate}` : "No agreed rate set yet";
+  btn.textContent = chat.agreedRate ? "Edit" : "Set Rate";
+  document.getElementById("chat-agreed-rate-form").style.display = "none";
+  document.getElementById("chat-agreed-rate").style.display = "flex";
 }
 
 function renderChatList() {
@@ -581,9 +653,11 @@ function renderChatList() {
       me.role === "tutee"
         ? `<p class="chat-list-empty">No chats yet. Choose a tutor from the Matching tab to start one.</p>`
         : `<p class="chat-list-empty">No chats yet. They'll show up here once a tutee chooses you.</p>`;
+    renderChatsTabBadge(0);
     return;
   }
 
+  let totalUnread = 0;
   list.innerHTML = chats
     .map((chat) => {
       const partnerEmail = otherPartyEmail(chat, me.email);
@@ -592,6 +666,8 @@ function renderChatList() {
       const last = msgs[msgs.length - 1];
       const preview = last ? (last.attachment ? `📎 ${last.attachment.name}` : last.text) : "No messages yet";
       const accentColor = subjectColor(chat.subject);
+      const unread = chat.id === activeChatId ? 0 : getUnreadCountForChat(me.email, chat.id);
+      totalUnread += unread;
       return `
         <button class="chat-list-item ${chat.id === activeChatId ? "active" : ""}" data-chat-id="${chat.id}" style="--accent-color:${accentColor}">
           <span class="chat-avatar" style="background:${colorForPerson(partnerEmail)}">${initials(partnerName)}</span>
@@ -599,6 +675,7 @@ function renderChatList() {
             <span class="chat-list-item-name">${partnerName}</span>
             <span class="chat-list-item-preview"><span class="chip-dot" style="background:${accentColor}"></span>${escapeHtml(preview)}</span>
           </span>
+          ${unread ? `<span class="chat-list-item-unread">${unread}</span>` : ""}
         </button>`;
     })
     .join("");
@@ -606,6 +683,15 @@ function renderChatList() {
   list.querySelectorAll(".chat-list-item").forEach((btn) => {
     btn.addEventListener("click", () => openChat(btn.dataset.chatId));
   });
+
+  renderChatsTabBadge(totalUnread);
+}
+
+function renderChatsTabBadge(totalUnread) {
+  const badge = document.getElementById("chats-tab-badge");
+  if (!badge) return;
+  badge.textContent = String(totalUnread);
+  badge.style.display = totalUnread ? "inline-block" : "none";
 }
 
 function openChat(chatId) {
@@ -625,7 +711,9 @@ function openChat(chatId) {
   subjectEl.style.color = accentColor;
   document.getElementById("chat-thread-head").style.setProperty("--accent-color", accentColor);
   document.getElementById("schedule-btn").style.display = me.role === "tutor" ? "inline-block" : "none";
+  renderAgreedRate(chat);
 
+  markChatRead(me.email, chatId);
   renderChatList();
   renderMessages(chatId);
 }
@@ -763,7 +851,11 @@ function startChatWith(tutorEmail) {
   const tutorProfile = getProfile(tutorEmail);
   const shared = myProfile.subjects.find((s) => tutorProfile.subjects.includes(s));
   const subject = shared || myProfile.subjects[0] || tutorProfile.subjects[0] || "General tutoring";
+  const isNewChat = !findChat(tutorEmail, me.email);
   const chat = createChat(tutorEmail, me.email, subject);
+  if (isNewChat && myProfile.offer) {
+    addMessage(chat.id, me.email, `${me.name} offered ${myProfile.offer} for tutoring — reply here to agree on a rate.`, null, true);
+  }
   window.goToTab("chats");
   openChat(chat.id);
 }
@@ -1029,6 +1121,10 @@ function handleScheduleTabSubmit(e) {
     errorEl.textContent = "Pick a date and time.";
     return;
   }
+  if (zoomLink && !/^https?:\/\//i.test(zoomLink)) {
+    errorEl.textContent = "Zoom link should start with http:// or https://";
+    return;
+  }
   const datetime = new Date(`${date}T${time}`);
   if (Number.isNaN(datetime.getTime()) || datetime < new Date()) {
     errorEl.textContent = "Pick a time in the future.";
@@ -1064,7 +1160,7 @@ function renderScheduleUpcoming() {
   if (!list) return;
   const sessions = getSessionsForUser(me.email);
   list.innerHTML = sessionListHtml(sessions);
-  wireSessionJoinButtons(list);
+  wireSessionButtons(list);
 }
 
 // ---------------- Sessions sidebar ----------------
@@ -1073,7 +1169,7 @@ function renderSessions() {
   const sessions = getSessionsForUser(me.email);
   const list = document.getElementById("sessions-list");
   list.innerHTML = sessionListHtml(sessions);
-  wireSessionJoinButtons(list);
+  wireSessionButtons(list);
 }
 
 function sessionListHtml(sessions) {
@@ -1088,36 +1184,132 @@ function sessionListHtml(sessions) {
       const start = new Date(s.datetime).getTime();
       const joinOpensAt = start - 5 * 60000;
       const end = start + s.durationMinutes * 60000 + 15 * 60000;
+      const cancelled = s.status === "cancelled";
 
       let statusHtml;
-      if (now < joinOpensAt) {
+      if (cancelled) {
+        statusHtml = `<span class="session-countdown session-cancelled-label">Cancelled${
+          s.cancelledBy === me.email ? " by you" : s.cancelledBy ? ` by ${escapeHtml(formatName(s.cancelledBy))}` : ""
+        }</span>`;
+      } else if (now < joinOpensAt) {
         statusHtml = `<span class="session-countdown">${countdownText(start - now)}</span>`;
       } else if (now <= end) {
         statusHtml = `<button class="btn-primary session-join" data-session-id="${s.id}">Join Video Call</button>`;
-        if (s.zoomLink) {
-          statusHtml += `<a class="btn-ghost session-zoom" href="${escapeHtml(s.zoomLink)}" target="_blank" rel="noopener noreferrer">Open Zoom Instead</a>`;
-        }
       } else {
         statusHtml = `<span class="session-countdown session-past">Completed</span>`;
       }
 
+      let zoomHtml = "";
+      if (!cancelled) {
+        if (s.zoomLink) {
+          zoomHtml = `
+            <div class="session-zoom-row">
+              <a class="btn-ghost session-zoom" href="${escapeHtml(s.zoomLink)}" target="_blank" rel="noopener noreferrer">Open Zoom Link</a>
+              <button type="button" class="link-btn session-zoom-copy" data-zoom-link="${escapeHtml(s.zoomLink)}">Copy</button>
+              ${
+                me.email === s.tutorEmail
+                  ? `<button type="button" class="link-btn session-zoom-edit" data-session-id="${s.id}" data-zoom-link="${escapeHtml(s.zoomLink)}">Edit</button>`
+                  : ""
+              }
+            </div>`;
+        } else if (me.email === s.tutorEmail) {
+          zoomHtml = `<button type="button" class="link-btn session-zoom-edit" data-session-id="${s.id}" data-zoom-link="">+ Add Zoom Link</button>`;
+        }
+      }
+
+      const cancelHtml =
+        !cancelled && now < end
+          ? `<button type="button" class="link-btn session-cancel" data-session-id="${s.id}">Cancel Session</button>`
+          : "";
+
       return `
-        <div class="session-card" style="--accent-color:${subjectColor(s.subject)}">
+        <div class="session-card ${cancelled ? "session-card-cancelled" : ""}" style="--accent-color:${subjectColor(s.subject)}">
           <span class="session-partner">${formatName(partnerEmail)}</span>
           <span class="session-subject">${escapeHtml(s.subject || "General tutoring")}</span>
           <span class="session-time">${formatDateTime(s.datetime)} · ${s.durationMinutes} min</span>
           ${statusHtml}
+          ${zoomHtml}
+          ${cancelHtml}
         </div>`;
     })
     .join("");
 }
 
-function wireSessionJoinButtons(container) {
+function wireSessionButtons(container) {
   container.querySelectorAll(".session-join").forEach((btn) => {
     btn.addEventListener("click", () => {
       window.location.href = `/video?session=${btn.dataset.sessionId}`;
     });
   });
+  container.querySelectorAll(".session-cancel").forEach((btn) => {
+    btn.addEventListener("click", () => handleCancelSession(btn.dataset.sessionId));
+  });
+  container.querySelectorAll(".session-zoom-copy").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const flash = (label) => {
+        const original = btn.textContent;
+        btn.textContent = label;
+        setTimeout(() => {
+          btn.textContent = original;
+        }, 1500);
+      };
+      if (!navigator.clipboard) {
+        flash("Copy failed");
+        return;
+      }
+      navigator.clipboard
+        .writeText(btn.dataset.zoomLink)
+        .then(() => flash("Copied!"))
+        .catch(() => flash("Copy failed"));
+    });
+  });
+  container.querySelectorAll(".session-zoom-edit").forEach((btn) => {
+    btn.addEventListener("click", () => handleEditZoomLink(btn.dataset.sessionId, btn.dataset.zoomLink));
+  });
+}
+
+// Cancellation is a status flip (not a delete) so both people keep a record.
+// The other party is "notified" the same way every other session update is
+// communicated here — a system message dropped into their shared chat.
+function handleCancelSession(sessionId) {
+  const session = getSessionById(sessionId);
+  if (!session) return;
+  if (!confirm("Cancel this session? The other person will see this in your chat.")) return;
+
+  cancelSession(sessionId, me.email);
+  const chat = getChatById(session.chatId);
+  if (chat) {
+    addMessage(chat.id, me.email, `${me.name} cancelled the session scheduled for ${formatDateTime(session.datetime)}.`, null, true);
+  }
+
+  renderSessions();
+  renderScheduleUpcoming();
+  renderChatList();
+  if (activeChatId === session.chatId) renderMessages(session.chatId);
+}
+
+// Zoom link editing after scheduling — not just at creation time — plus a
+// basic URL sanity check. Posts a system message so a link change counts as
+// an "essential session update" the other party sees, same as cancellation.
+function handleEditZoomLink(sessionId, currentLink) {
+  const value = prompt("Zoom link for this session:", currentLink || "");
+  if (value === null) return;
+  const trimmed = value.trim();
+  if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+    alert("That doesn't look like a valid link — it should start with http:// or https://");
+    return;
+  }
+
+  const session = updateSessionZoomLink(sessionId, trimmed);
+  if (!session) return;
+  const chat = getChatById(session.chatId);
+  if (chat) {
+    addMessage(chat.id, me.email, trimmed ? `Zoom link updated: ${trimmed}` : "Zoom link removed.", null, true);
+  }
+
+  renderSessions();
+  renderScheduleUpcoming();
+  if (activeChatId === session.chatId) renderMessages(session.chatId);
 }
 
 function countdownText(ms) {
