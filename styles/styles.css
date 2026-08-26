@@ -323,6 +323,65 @@ a:focus-visible {
   padding-right: 44px;
 }
 
+/* ---------- Sign agreement ---------- */
+
+.agreement-preview-wrap {
+  margin-bottom: 24px;
+  border: 1.5px solid #dfe3e6;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.agreement-preview-frame {
+  width: 100%;
+  height: 320px;
+  border: none;
+  display: block;
+}
+
+.sign-block {
+  border: 1.5px solid #dfe3e6;
+  border-radius: var(--radius);
+  padding: 18px;
+  margin: 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sign-block legend {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  padding: 0 6px;
+}
+
+.sig-pad-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.sig-pad-canvas {
+  width: 100%;
+  max-width: 500px;
+  aspect-ratio: 500 / 130;
+  border: 1.5px solid #dfe3e6;
+  border-radius: var(--radius);
+  background: var(--white);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.sign-date-display {
+  font-size: 15px;
+  color: var(--navy-dark);
+  padding: 12px 14px;
+  background: var(--gray-light);
+  border-radius: var(--radius);
+}
+
 .toggle-visibility {
   position: absolute;
   right: 8px;

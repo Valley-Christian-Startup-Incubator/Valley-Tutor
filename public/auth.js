@@ -258,7 +258,7 @@ formSignup.addEventListener("submit", async (e) => {
 
   showSuccess(`Account created! Welcome to Peer Tutoring, ${name.split(" ")[0]}.`);
   setTimeout(() => {
-    window.location.href = "/app";
+    window.location.href = "/sign-agreement";
   }, 700);
 });
 

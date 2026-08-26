@@ -6,7 +6,33 @@ let pendingAttachment = null;
 
 const me = requireSession("/login");
 
-if (me) {
+// Gate on the signed agreement before anything else can render — signup
+// already routes here first, but this is the actual enforcement point (also
+// catches someone who signed up, closed the tab, and logged back in later).
+// A failed status check fails OPEN (logs and lets them through) rather than
+// locking someone out over a transient network hiccup — this app doesn't
+// otherwise defend against a determined client-side bypass, so a hard lock
+// here would be inconsistent with its existing trust model, not more secure.
+async function hasSignedAgreement(email) {
+  try {
+    const res = await fetch(`/api/agreements/status?email=${encodeURIComponent(email)}`);
+    if (!res.ok) throw new Error(`status check failed: ${res.status}`);
+    const data = await res.json();
+    return Boolean(data.signed);
+  } catch (err) {
+    console.error("Agreement status check failed, letting the user through:", err);
+    return true;
+  }
+}
+
+(async () => {
+  if (!me) return;
+
+  if (!(await hasSignedAgreement(me.email))) {
+    window.location.href = "/sign-agreement";
+    return;
+  }
+
   document.getElementById("me-name").textContent = me.name;
   document.getElementById("me-role-pill").textContent = me.role;
   renderHeaderAvatar();
@@ -47,7 +73,7 @@ if (me) {
   });
 
   setInterval(renderSessions, 30000);
-}
+})();
 
 // ---------------- Tabs ----------------
 
