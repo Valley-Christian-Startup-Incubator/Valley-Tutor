@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fillAgreementPdf } from "@/lib/agreementPdf";
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin, toPublicSupabaseUrl } from "@/lib/supabaseAdmin";
 
 function isDataUrlPng(value: unknown): value is string {
   return typeof value === "string" && value.startsWith("data:image/png;base64,") && value.length > 100;
@@ -80,5 +80,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Signed, but could not create a download link." }, { status: 500 });
   }
 
-  return NextResponse.json({ downloadUrl: signedUrlData.signedUrl });
+  return NextResponse.json({ downloadUrl: toPublicSupabaseUrl(signedUrlData.signedUrl) });
 }
