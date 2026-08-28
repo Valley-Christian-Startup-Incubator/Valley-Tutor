@@ -1,4 +1,5 @@
 import Script from "next/script";
+import { BUILD_VERSION } from "../../lib/buildVersion";
 
 export default function AppPage() {
   return (
@@ -346,7 +347,7 @@ export default function AppPage() {
         </div>
       </div>
 
-      <Script src="/app.js" strategy="afterInteractive" />
+      <Script src={`/app.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>
   );
 }

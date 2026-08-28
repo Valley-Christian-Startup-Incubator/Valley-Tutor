@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { BUILD_VERSION } from "../../lib/buildVersion";
 
 export const metadata: Metadata = {
   title: "Video Session | Peer Tutoring",
@@ -67,7 +68,7 @@ export default function VideoPage() {
         </footer>
       </div>
 
-      <Script src="/video.js" strategy="afterInteractive" />
+      <Script src={`/video.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>
   );
 }

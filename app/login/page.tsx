@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { BUILD_VERSION } from "../../lib/buildVersion";
 
 export const metadata: Metadata = {
   title: "Log In | Valley Christian Schools Peer Tutoring",
@@ -198,7 +199,7 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <Script src="/auth.js" strategy="afterInteractive" />
+      <Script src={`/auth.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>
   );
 }
