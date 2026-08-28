@@ -1,25 +1,4 @@
-const USERS_KEY = "wc_users";
 const SESSION_KEY = "wc_session";
-
-function getUsers() {
-  return JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-function getUserByEmail(email) {
-  return getUsers().find((u) => u.email === email);
-}
-
-async function hashPassword(password) {
-  const data = new TextEncoder().encode(password);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 // Sessions live in sessionStorage only (per-tab), never localStorage, so two
 // tabs in the same browser can stay logged in as two different people at
@@ -31,13 +10,17 @@ function getSession() {
   return raw ? JSON.parse(raw) : null;
 }
 
-function startSession(user) {
-  const value = JSON.stringify({ name: user.name, email: user.email, role: user.role });
+function startSession(token, user) {
+  const value = JSON.stringify({ token, name: user.name, email: user.email, role: user.role });
   sessionStorage.setItem(SESSION_KEY, value);
 }
 
 function clearSession() {
+  const session = getSession();
   sessionStorage.removeItem(SESSION_KEY);
+  if (session?.token) {
+    fetch("/api/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${session.token}` } }).catch(() => {});
+  }
 }
 
 function requireSession(redirectTo) {
@@ -47,6 +30,31 @@ function requireSession(redirectTo) {
     return null;
   }
   return session;
+}
+
+// Every authenticated API call goes through here so the bearer token is
+// never forgotten, and an expired/revoked token (401) reactively bounces
+// back to login instead of the app silently failing.
+async function authFetch(path, options = {}) {
+  const session = getSession();
+  const headers = { ...(options.headers || {}) };
+  if (session?.token) headers.Authorization = `Bearer ${session.token}`;
+  if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+
+  const res = await fetch(path, { ...options, headers });
+  if (res.status === 401) {
+    clearSession();
+    window.location.href = "/login";
+    throw new Error("Session expired.");
+  }
+  return res;
+}
+
+async function authFetchJson(path, options) {
+  const res = await authFetch(path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Something went wrong.");
+  return data;
 }
 
 // Reads a video file into a data URL, checking file size up front and clip

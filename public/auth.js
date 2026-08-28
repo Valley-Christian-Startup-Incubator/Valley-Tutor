@@ -174,18 +174,23 @@ formLogin.addEventListener("submit", async (e) => {
   const submitBtn = document.getElementById("login-submit");
   submitBtn.disabled = true;
 
-  const users = getUsers();
-  const user = users.find((u) => u.email === email);
-  const passwordHash = await hashPassword(password);
-
-  if (!user || user.passwordHash !== passwordHash) {
-    showError("That email and password don't match an account here.");
+  let data;
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || "That email and password don't match an account here.");
+  } catch (err) {
+    showError(err.message);
     submitBtn.disabled = false;
     return;
   }
 
-  startSession(user);
-  showSuccess(`Welcome back, ${user.name.split(" ")[0]}! Taking you to your dashboard…`);
+  startSession(data.token, data.user);
+  showSuccess(`Welcome back, ${data.user.name.split(" ")[0]}! Taking you to your dashboard…`);
   setTimeout(() => {
     window.location.href = "/app";
   }, 700);
@@ -229,31 +234,28 @@ formSignup.addEventListener("submit", async (e) => {
   const submitBtn = document.getElementById("signup-submit");
   submitBtn.disabled = true;
 
-  const users = getUsers();
-  if (users.some((u) => u.email === email)) {
-    setFieldError("field-signup-email", "An account with this email already exists.");
+  let data;
+  try {
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, role }),
+    });
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Could not create your account.");
+  } catch (err) {
+    setFieldError("field-signup-email", err.message);
     submitBtn.disabled = false;
     return;
   }
 
-  const passwordHash = await hashPassword(password);
-  const newUser = {
-    id: crypto.randomUUID(),
-    name,
-    email,
-    passwordHash,
-    role,
-    createdAt: new Date().toISOString(),
-  };
-  users.push(newUser);
-  saveUsers(users);
-  startSession(newUser);
+  startSession(data.token, data.user);
 
   if (signupPendingPhoto || signupPendingVideo) {
-    const profile = getProfile(email);
+    const profile = await getMyProfile();
     profile.photo = signupPendingPhoto;
     if (role === "tutor") profile.introVideo = signupPendingVideo;
-    saveProfile(email, profile);
+    await saveMyProfile(profile);
   }
 
   showSuccess(`Account created! Welcome to Peer Tutoring, ${name.split(" ")[0]}.`);

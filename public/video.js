@@ -7,7 +7,7 @@ if (me) {
 async function init() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session");
-  const session = sessionId ? getSessionById(sessionId) : null;
+  const session = sessionId ? await getSessionById(sessionId).catch(() => null) : null;
 
   if (!session || (session.tutorEmail !== me.email && session.tuteeEmail !== me.email)) {
     showError("This session doesn't exist, or you're not part of it.");
@@ -15,7 +15,8 @@ async function init() {
   }
 
   const partnerEmail = otherPartyEmail(session, me.email);
-  document.getElementById("call-partner-name").textContent = formatName(partnerEmail);
+  const partnerName = otherPartyName(session, me.email) || partnerEmail;
+  document.getElementById("call-partner-name").textContent = partnerName;
   document.getElementById("call-subject").textContent = session.subject || "General tutoring";
   document.getElementById("call-shell").style.display = "flex";
 
@@ -127,7 +128,7 @@ async function init() {
     } else if (data.type === "leave") {
       statusEl.textContent = "They left";
       waitingOverlay.style.display = "flex";
-      document.getElementById("waiting-text").textContent = `${formatName(partnerEmail)} left the call.`;
+      document.getElementById("waiting-text").textContent = `${partnerName} left the call.`;
       remoteVideo.srcObject = null;
     }
   };

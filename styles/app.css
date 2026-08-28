@@ -1340,31 +1340,44 @@
   border-radius: 999px;
 }
 
-.chat-agreed-rate {
+.chat-rate-widget {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 6px;
+  flex-wrap: wrap;
 }
 
-.chat-agreed-rate span {
+.chat-rate-widget span {
   font-size: 12px;
   color: #7b858d;
 }
 
-.chat-agreed-rate .link-btn,
-.chat-agreed-rate-form .link-btn {
+.chat-rate-widget .link-btn,
+.chat-rate-form .link-btn {
   font-size: 12px;
 }
 
-.chat-agreed-rate-form {
+.chat-rate-widget .btn-primary {
+  max-width: none;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.chat-rate-widget .btn-ghost {
+  max-width: none;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.chat-rate-form {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 6px;
 }
 
-.chat-agreed-rate-form input {
+.chat-rate-form input {
   font-family: var(--font-sans);
   font-size: 13px;
   padding: 6px 10px;
@@ -1373,13 +1386,13 @@
   width: 130px;
 }
 
-.chat-agreed-rate-form input:focus {
+.chat-rate-form input:focus {
   outline: none;
   border-color: var(--sky);
   box-shadow: 0 0 0 3px rgba(140, 210, 244, 0.35);
 }
 
-.chat-agreed-rate-form button[type="submit"] {
+.chat-rate-form button[type="submit"] {
   max-width: none;
   padding: 6px 14px;
   font-size: 12.5px;

@@ -223,15 +223,7 @@ export default function AppPage() {
                   <div>
                     <h2 id="chat-partner-name"></h2>
                     <span className="chat-subject" id="chat-subject"></span>
-                    <div className="chat-agreed-rate" id="chat-agreed-rate">
-                      <span id="chat-agreed-rate-text"></span>
-                      <button type="button" className="link-btn" id="chat-agreed-rate-btn">Set Rate</button>
-                    </div>
-                    <form className="chat-agreed-rate-form" id="chat-agreed-rate-form" style={{ display: "none" }}>
-                      <input type="text" id="chat-agreed-rate-input" placeholder="e.g. $15/hr" autoComplete="off" />
-                      <button type="submit" className="btn-ghost">Save</button>
-                      <button type="button" className="link-btn" id="chat-agreed-rate-cancel">Cancel</button>
-                    </form>
+                    <div className="chat-rate-widget" id="chat-rate-widget"></div>
                   </div>
                   <button className="btn-ghost" id="schedule-btn" style={{ display: "none" }}>Schedule Session</button>
                 </div>

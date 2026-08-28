@@ -1,9 +1,3 @@
-const PROFILES_KEY = "wc_profiles";
-const CHATS_KEY = "wc_chats";
-const MESSAGES_KEY = "wc_messages";
-const SESSIONS_KEY = "wc_sessions";
-const COMMENTS_KEY = "wc_comments";
-
 // ---------- Course catalog ----------
 // Pulled from the school's course list, teachers stripped (a class taught by
 // three different teachers is still one class) and grouped by base course
@@ -324,94 +318,42 @@ const AVAILABILITY_FORMATS = ["In-Person", "Online", "Both"];
 
 const PAYMENT_METHODS = ["Venmo", "Zelle", "PayPal", "Cash"];
 
-function readJSON(key, fallback) {
-  return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
-}
-
-function writeJSON(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (err) {
-    // Most likely a quota overrun from a large photo/video data URL — this is
-    // a prototype storing everything in localStorage, so there's no server
-    // fallback, just a clear message instead of a silent failure.
-    alert("This device is out of local storage space. Try removing a photo, video, or old chat attachment and saving again.");
-    throw err;
-  }
-}
-
 // ---------- Profiles ----------
+// Everything below this point talks to the real database on the Mac Studio
+// via authFetch (see core.js) instead of localStorage — accounts, profiles,
+// chats, messages, and sessions are shared server-side now, so two different
+// people on two different devices actually see the same data.
 
-function getProfiles() {
-  return readJSON(PROFILES_KEY, {});
+async function getMyProfile() {
+  return authFetchJson("/api/profiles/me");
 }
 
-// Merges the stored profile over these defaults (rather than only using
-// defaults when a profile is missing entirely) so an account saved before
-// some field existed — schema has grown a lot across iterations — still
-// gets a well-formed object instead of `undefined` where code expects an
-// array or string.
-function getProfile(email) {
-  const defaults = {
-    photo: "",
-    bio: "",
-    classYear: "",
-    takenCourses: [],
-    subjects: [],
-    gradeLevel: "",
-    gradeLevels: [],
-    availability: [],
-    availabilityLocations: {},
-    availabilityFormats: {},
-    introVideo: "",
-    rate: "",
-    offer: "",
-    tutoringHours: "",
-    paymentMethods: [],
-    paymentHandle: "",
-  };
-  return Object.assign({}, defaults, getProfiles()[email] || {});
-}
-
-function saveProfile(email, profile) {
-  const profiles = getProfiles();
-  profiles[email] = profile;
-  writeJSON(PROFILES_KEY, profiles);
+async function saveMyProfile(profile) {
+  await authFetchJson("/api/profiles/me", { method: "PUT", body: JSON.stringify(profile) });
   notifyUpdate("profile");
+}
+
+async function getProfileByEmail(email) {
+  return authFetchJson(`/api/profiles/${encodeURIComponent(email)}`);
+}
+
+async function getAllTutors() {
+  return authFetchJson("/api/tutors");
 }
 
 // ---------- Chats ----------
 
-function getChats() {
-  return readJSON(CHATS_KEY, []);
+async function getMyChats() {
+  return authFetchJson("/api/chats");
 }
 
-function getChatsForUser(email) {
-  return getChats().filter((c) => c.tutorEmail === email || c.tuteeEmail === email);
+async function getChatById(chatId) {
+  return authFetchJson(`/api/chats/${chatId}`);
 }
 
-function getChatById(chatId) {
-  return getChats().find((c) => c.id === chatId) || null;
-}
-
-function findChat(tutorEmail, tuteeEmail) {
-  return getChats().find((c) => c.tutorEmail === tutorEmail && c.tuteeEmail === tuteeEmail) || null;
-}
-
-function createChat(tutorEmail, tuteeEmail, subject) {
-  const existing = findChat(tutorEmail, tuteeEmail);
-  if (existing) return existing;
-  const chats = getChats();
-  const chat = {
-    id: crypto.randomUUID(),
-    tutorEmail,
-    tuteeEmail,
-    subject: subject || "",
-    agreedRate: "",
-    createdAt: new Date().toISOString(),
-  };
-  chats.push(chat);
-  writeJSON(CHATS_KEY, chats);
+// Only a tutee calls this — they're the one choosing a tutor to chat with.
+async function createChat(tutorEmail, subject) {
+  const chat = await authFetchJson("/api/chats", { method: "POST", body: JSON.stringify({ tutorEmail, subject }) });
   notifyUpdate("chat");
   return chat;
 }
@@ -420,53 +362,41 @@ function otherPartyEmail(chat, myEmail) {
   return chat.tutorEmail === myEmail ? chat.tuteeEmail : chat.tutorEmail;
 }
 
-// The hourly rate a tutor and tutee land on for this relationship, recorded
-// on the chat itself (rather than only in a one-off message) so either side
-// can look it up later without scrolling back through history.
-function setChatAgreedRate(chatId, rate) {
-  const chats = getChats();
-  const idx = chats.findIndex((c) => c.id === chatId);
-  if (idx === -1) return null;
-  chats[idx] = { ...chats[idx], agreedRate: rate || "" };
-  writeJSON(CHATS_KEY, chats);
-  notifyUpdate("chat");
-  return chats[idx];
+function otherPartyName(chat, myEmail) {
+  return chat.tutorEmail === myEmail ? chat.tuteeName : chat.tutorName;
 }
 
 // ---------- Messages ----------
 
-function getAllMessages() {
-  return readJSON(MESSAGES_KEY, []);
+async function getMessagesForChat(chatId) {
+  return authFetchJson(`/api/chats/${chatId}/messages`);
 }
 
-function getMessagesForChat(chatId) {
-  return getAllMessages()
-    .filter((m) => m.chatId === chatId)
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-}
-
-function addMessage(chatId, sender, text, attachment, system) {
-  const messages = getAllMessages();
-  const message = {
-    id: crypto.randomUUID(),
-    chatId,
-    sender,
-    text: text || "",
-    attachment: attachment || null,
-    system: Boolean(system),
-    timestamp: new Date().toISOString(),
-  };
-  messages.push(message);
-  writeJSON(MESSAGES_KEY, messages);
+async function addMessage(chatId, text, attachment, system) {
+  const message = await authFetchJson(`/api/chats/${chatId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ text: text || "", attachment: attachment || null, system: Boolean(system) }),
+  });
   notifyUpdate("message");
   return message;
 }
 
 // ---------- Read state (unread-message badges) ----------
-// Per-user, per-chat "last read" timestamps, so the Chats tab and chat list
-// can show an unread indicator without a real backend read-receipt system.
+// Kept as a lightweight per-device localStorage marker rather than moving to
+// the server — "have I personally looked at this chat on this device" is a
+// reasonable thing to keep local, and it degrades gracefully (worst case,
+// the badge just reflects this device's own view) rather than blocking
+// anything else in this migration.
 
 const READ_STATE_KEY = "wc_read_state";
+
+function readJSON(key, fallback) {
+  return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+}
+
+function writeJSON(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
 
 function getReadState() {
   return readJSON(READ_STATE_KEY, {});
@@ -479,149 +409,97 @@ function markChatRead(email, chatId) {
   writeJSON(READ_STATE_KEY, state);
 }
 
-function getUnreadCountForChat(email, chatId) {
+async function getUnreadCountForChat(email, chatId) {
   const state = getReadState();
   const lastRead = state[email] && state[email][chatId];
-  return getMessagesForChat(chatId).filter(
+  const messages = await getMessagesForChat(chatId);
+  return messages.filter(
     (m) => !m.system && m.sender !== email && (!lastRead || new Date(m.timestamp) > new Date(lastRead))
   ).length;
 }
 
 // ---------- Sessions ----------
 
-function getSessions() {
-  return readJSON(SESSIONS_KEY, []);
+async function getMySessions() {
+  return authFetchJson("/api/sessions");
 }
 
-function getSessionsForUser(email) {
-  return getSessions()
-    .filter((s) => s.tutorEmail === email || s.tuteeEmail === email)
-    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+async function getSessionById(id) {
+  return authFetchJson(`/api/sessions/${id}`);
 }
 
-function getSessionById(id) {
-  return getSessions().find((s) => s.id === id) || null;
-}
-
-function createSession({ chatId, tutorEmail, tuteeEmail, subject, datetime, durationMinutes, zoomLink }) {
-  const sessions = getSessions();
-  const session = {
-    id: crypto.randomUUID(),
-    chatId,
-    tutorEmail,
-    tuteeEmail,
-    subject: subject || "",
-    datetime,
-    durationMinutes: Number(durationMinutes) || 30,
-    zoomLink: zoomLink || "",
-    status: "scheduled",
-    createdAt: new Date().toISOString(),
-  };
-  sessions.push(session);
-  writeJSON(SESSIONS_KEY, sessions);
+async function createSession({ chatId, datetime, durationMinutes, zoomLink }) {
+  const session = await authFetchJson("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({ chatId, datetime, durationMinutes, zoomLink }),
+  });
   notifyUpdate("session");
   return session;
 }
 
 // Cancellation is a status flip, not a delete — a cancelled session stays
 // visible (marked as such) instead of vanishing, so both sides retain a
-// record of it. `cancelledByEmail` drives the "cancelled by you" vs.
-// "cancelled by <name>" distinction in the UI.
-function cancelSession(sessionId, cancelledByEmail) {
-  const sessions = getSessions();
-  const idx = sessions.findIndex((s) => s.id === sessionId);
-  if (idx === -1) return null;
-  sessions[idx] = {
-    ...sessions[idx],
-    status: "cancelled",
-    cancelledBy: cancelledByEmail,
-    cancelledAt: new Date().toISOString(),
-  };
-  writeJSON(SESSIONS_KEY, sessions);
+// record of it.
+async function cancelSession(sessionId) {
+  const session = await authFetchJson(`/api/sessions/${sessionId}/cancel`, { method: "POST" });
   notifyUpdate("session");
-  return sessions[idx];
+  return session;
 }
 
-function updateSessionZoomLink(sessionId, zoomLink) {
-  const sessions = getSessions();
-  const idx = sessions.findIndex((s) => s.id === sessionId);
-  if (idx === -1) return null;
-  sessions[idx] = { ...sessions[idx], zoomLink: zoomLink || "" };
-  writeJSON(SESSIONS_KEY, sessions);
+async function updateSessionZoomLink(sessionId, zoomLink) {
+  const session = await authFetchJson(`/api/sessions/${sessionId}/zoom-link`, {
+    method: "PATCH",
+    body: JSON.stringify({ zoomLink }),
+  });
   notifyUpdate("session");
-  return sessions[idx];
+  return session;
+}
+
+// ---------- Rate agreements ----------
+// Either party can propose; the *other* party accepts — recorded on the
+// server (see app/api/chats/[chatId]/rate-agreement/*) so it can be pulled
+// into an admin view later.
+
+async function getRateAgreement(chatId) {
+  return authFetchJson(`/api/chats/${chatId}/rate-agreement`);
+}
+
+async function proposeRate(chatId, rate) {
+  const agreement = await authFetchJson(`/api/chats/${chatId}/rate-agreement/propose`, {
+    method: "POST",
+    body: JSON.stringify({ rate }),
+  });
+  notifyUpdate("rateAgreement");
+  return agreement;
+}
+
+async function acceptRate(chatId) {
+  const agreement = await authFetchJson(`/api/chats/${chatId}/rate-agreement/accept`, { method: "POST" });
+  notifyUpdate("rateAgreement");
+  return agreement;
 }
 
 // ---------- Comments (tutee feedback on tutors) ----------
-// Not real moderation — there's no backend or human reviewer here, just a
-// keyword heuristic standing in for one. "Warm" comments show up on the
-// tutor's profile immediately; "cold" ones are held back (never shown to
-// anyone in this prototype) instead of being emailed to a coordinator, since
-// there's nowhere to send that email from a static site.
+// Not real moderation — there's no human reviewer here, just a keyword
+// heuristic standing in for one (see lib/comments.ts, now server-side).
+// "Warm" comments show up on the tutor's profile immediately; "cold" ones
+// are held back (never shown to anyone in this prototype).
 
-const NEGATIVE_COMMENT_WORDS = [
-  "bad",
-  "rude",
-  "late",
-  "unprepared",
-  "mean",
-  "awful",
-  "terrible",
-  "worst",
-  "unhelpful",
-  "disrespectful",
-  "cancel",
-  "no show",
-  "noshow",
-  "yell",
-  "angry",
-  "hate",
-  "horrible",
-  "waste",
-  "annoying",
-  "condescending",
-  "never showed",
-  "didn't show",
-  "didn't help",
-  "confusing",
-  "useless",
-];
-
-function classifyComment(text) {
-  const lower = text.toLowerCase();
-  return NEGATIVE_COMMENT_WORDS.some((w) => lower.includes(w)) ? "cold" : "warm";
+async function getVisibleCommentsForTutor(tutorEmail) {
+  return authFetchJson(`/api/comments/${encodeURIComponent(tutorEmail)}`);
 }
 
-function getComments() {
-  return readJSON(COMMENTS_KEY, []);
-}
-
-function getVisibleCommentsForTutor(tutorEmail) {
-  return getComments()
-    .filter((c) => c.tutorEmail === tutorEmail && c.sentiment === "warm")
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-}
-
-function addComment(tutorEmail, authorEmail, text) {
-  const comments = getComments();
-  const comment = {
-    id: crypto.randomUUID(),
-    tutorEmail,
-    authorEmail,
-    text,
-    sentiment: classifyComment(text),
-    createdAt: new Date().toISOString(),
-  };
-  comments.push(comment);
-  writeJSON(COMMENTS_KEY, comments);
+async function addComment(tutorEmail, text) {
+  await authFetchJson("/api/comments", { method: "POST", body: JSON.stringify({ tutorEmail, text }) });
   notifyUpdate("comment");
-  return comment;
 }
 
 // ---------- Cross-tab live updates ----------
-// Chats/sessions are demoed across two tabs in the same browser (tutor +
-// tutee), so a BroadcastChannel keeps every open tab in sync without a
-// manual refresh. `storage` is a fallback for browsers without it.
+// Chats/sessions/etc. now live server-side, so BroadcastChannel is just a
+// same-browser "someone made a change, refresh now" nudge layered on top of
+// the periodic polling in app.js — it's not the sync mechanism itself
+// anymore (that's real cross-device sync via the API), just a nice instant
+// same-browser demo touch, same as before.
 
 const wcChannel = "BroadcastChannel" in window ? new BroadcastChannel("wc_updates") : null;
 
@@ -633,16 +511,6 @@ function onUpdate(callback) {
   if (wcChannel) {
     wcChannel.onmessage = (e) => callback(e.data.type);
   }
-  window.addEventListener("storage", (e) => {
-    if ([PROFILES_KEY, CHATS_KEY, MESSAGES_KEY, SESSIONS_KEY, COMMENTS_KEY, READ_STATE_KEY].includes(e.key)) {
-      callback("storage");
-    }
-  });
-}
-
-function formatName(email) {
-  const user = getUserByEmail(email);
-  return user ? user.name : email;
 }
 
 function initials(name) {

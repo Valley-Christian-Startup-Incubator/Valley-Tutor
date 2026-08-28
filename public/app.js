@@ -25,6 +25,29 @@ async function hasSignedAgreement(email) {
   }
 }
 
+// Re-fetches and re-renders everything data-dependent — called on the
+// same-browser BroadcastChannel nudge AND on a plain interval, since chats/
+// messages/sessions now live server-side and a tutor and tutee on two
+// separate real devices have no shared BroadcastChannel to notify each
+// other with.
+function refreshAll() {
+  if (activeChatId) {
+    markChatRead(me.email, activeChatId);
+    getChatById(activeChatId).then((chat) => {
+      if (chat) renderRateWidget(chat);
+    });
+  }
+  renderChatList();
+  if (activeChatId) renderMessages(activeChatId);
+  renderSessions();
+  if (me.role === "tutor") {
+    populateScheduleTuteeSelect();
+    renderScheduleUpcoming();
+  } else {
+    renderMatchingList();
+  }
+}
+
 (async () => {
   if (!me) return;
 
@@ -55,24 +78,8 @@ async function hasSignedAgreement(email) {
     initMatchingTab();
   }
 
-  onUpdate(() => {
-    if (activeChatId) {
-      markChatRead(me.email, activeChatId);
-      const activeChat = getChatById(activeChatId);
-      if (activeChat) renderAgreedRate(activeChat);
-    }
-    renderChatList();
-    if (activeChatId) renderMessages(activeChatId);
-    renderSessions();
-    if (me.role === "tutor") {
-      populateScheduleTuteeSelect();
-      renderScheduleUpcoming();
-    } else {
-      renderMatchingList();
-    }
-  });
-
-  setInterval(renderSessions, 30000);
+  onUpdate(refreshAll);
+  setInterval(refreshAll, 8000);
 })();
 
 // ---------------- Tabs ----------------
@@ -139,8 +146,8 @@ function initTabs() {
 
 // ---------------- Header avatar ----------------
 
-function renderHeaderAvatar() {
-  const profile = getProfile(me.email);
+async function renderHeaderAvatar() {
+  const profile = await getMyProfile();
   const img = document.getElementById("header-avatar-img");
   const initialsEl = document.getElementById("header-avatar-initials");
   if (profile.photo) {
@@ -156,9 +163,9 @@ function renderHeaderAvatar() {
 
 // ---------------- Profile tab ----------------
 
-function initProfileTab() {
+async function initProfileTab() {
   const isTutor = me.role === "tutor";
-  const profile = getProfile(me.email);
+  const profile = await getMyProfile();
 
   document.getElementById("profile-name-heading").textContent = me.name;
   document.getElementById("profile-subtitle").textContent = isTutor
@@ -310,17 +317,17 @@ function initProfileTab() {
   ).join("");
 
   // Comments a tutor has received (warm ones only — cold feedback is held
-  // back, see data.js). Tutees don't have a comments card.
+  // back, see lib/comments.ts). Tutees don't have a comments card.
   const commentsCard = document.getElementById("tutor-comments-card");
   if (isTutor) {
     commentsCard.style.display = "block";
-    const comments = getVisibleCommentsForTutor(me.email);
+    const comments = await getVisibleCommentsForTutor(me.email);
     document.getElementById("tutor-comments-list").innerHTML = comments.length
       ? comments
           .map(
             (c) => `
         <div class="tutor-comment-row">
-          <span class="tutor-comment-author">${escapeHtml(formatName(c.authorEmail))}</span>
+          <span class="tutor-comment-author">${escapeHtml(c.authorName || c.authorEmail)}</span>
           <span class="tutor-comment-date">${formatDateTime(c.createdAt)}</span>
           <p class="tutor-comment-text">${escapeHtml(c.text)}</p>
         </div>`
@@ -567,7 +574,7 @@ function initProfileTab() {
   renderAvailabilityGrid();
   renderAvailLocations();
 
-  document.getElementById("profile-form").addEventListener("submit", (e) => {
+  document.getElementById("profile-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const availability = Array.from(document.querySelectorAll('input[name="availability"]:checked')).map((i) => i.value);
     const availabilityLocations = {};
@@ -604,7 +611,7 @@ function initProfileTab() {
       newProfile.gradeLevels = [];
       newProfile.classYear = "";
     }
-    saveProfile(me.email, newProfile);
+    await saveMyProfile(newProfile);
     renderHeaderAvatar();
 
     const alertEl = document.getElementById("profile-alert");
@@ -634,44 +641,74 @@ function initChatsTab() {
   document.getElementById("attach-btn").addEventListener("click", () => document.getElementById("file-input").click());
   document.getElementById("file-input").addEventListener("change", handleFileSelect);
 
-  document.getElementById("chat-agreed-rate-btn").addEventListener("click", () => {
-    if (!activeChatId) return;
-    const chat = getChatById(activeChatId);
-    document.getElementById("chat-agreed-rate-input").value = (chat && chat.agreedRate) || "";
-    document.getElementById("chat-agreed-rate").style.display = "none";
-    document.getElementById("chat-agreed-rate-form").style.display = "flex";
-    document.getElementById("chat-agreed-rate-input").focus();
-  });
-  document.getElementById("chat-agreed-rate-cancel").addEventListener("click", () => {
-    const chat = getChatById(activeChatId);
-    if (chat) renderAgreedRate(chat);
-  });
-  document.getElementById("chat-agreed-rate-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    if (!activeChatId) return;
-    const rate = document.getElementById("chat-agreed-rate-input").value.trim();
-    const chat = setChatAgreedRate(activeChatId, rate);
-    addMessage(activeChatId, me.email, rate ? `Agreed hourly rate set to ${rate}.` : "Agreed hourly rate cleared.", null, true);
-    renderAgreedRate(chat);
-    renderMessages(activeChatId);
-    renderChatList();
-  });
-
   renderChatList();
   renderSessions();
 }
 
-function renderAgreedRate(chat) {
-  const textEl = document.getElementById("chat-agreed-rate-text");
-  const btn = document.getElementById("chat-agreed-rate-btn");
-  textEl.textContent = chat.agreedRate ? `Agreed rate: ${chat.agreedRate}` : "No agreed rate set yet";
-  btn.textContent = chat.agreedRate ? "Edit" : "Set Rate";
-  document.getElementById("chat-agreed-rate-form").style.display = "none";
-  document.getElementById("chat-agreed-rate").style.display = "flex";
+// ---------------- Rate agreement widget ----------------
+// Either party can propose an hourly rate; the *other* party has to accept
+// it (never the proposer) — recorded server-side (rate_agreements table) so
+// it can be pulled into an admin view later.
+
+async function renderRateWidget(chat) {
+  const widget = document.getElementById("chat-rate-widget");
+  if (!widget) return;
+  const partnerName = otherPartyName(chat, me.email) || "the other person";
+  const agreement = await getRateAgreement(chat.id);
+
+  if (!agreement) {
+    widget.innerHTML = `<button type="button" class="btn-ghost chat-rate-propose-btn">Propose a Rate</button>`;
+  } else if (agreement.status === "pending" && agreement.proposedBy === me.email) {
+    widget.innerHTML = `
+      <span>Waiting for ${escapeHtml(partnerName)} to accept ${escapeHtml(agreement.rate)}</span>
+      <button type="button" class="link-btn chat-rate-propose-btn">Change</button>`;
+  } else if (agreement.status === "pending") {
+    widget.innerHTML = `
+      <span>${escapeHtml(partnerName)} proposed ${escapeHtml(agreement.rate)}</span>
+      <button type="button" class="btn-primary chat-rate-accept-btn">Accept</button>
+      <button type="button" class="link-btn chat-rate-propose-btn">Propose different rate</button>`;
+  } else {
+    widget.innerHTML = `
+      <span>✓ Agreed rate: ${escapeHtml(agreement.rate)}</span>
+      <button type="button" class="link-btn chat-rate-propose-btn">Renegotiate</button>`;
+  }
+
+  const proposeBtn = widget.querySelector(".chat-rate-propose-btn");
+  if (proposeBtn) proposeBtn.addEventListener("click", () => showRateProposeForm(chat));
+  const acceptBtn = widget.querySelector(".chat-rate-accept-btn");
+  if (acceptBtn) acceptBtn.addEventListener("click", () => handleAcceptRate(chat));
 }
 
-function renderChatList() {
-  const chats = getChatsForUser(me.email);
+function showRateProposeForm(chat) {
+  const widget = document.getElementById("chat-rate-widget");
+  widget.innerHTML = `
+    <form class="chat-rate-form" id="chat-rate-propose-form">
+      <input type="text" id="chat-rate-input" placeholder="e.g. $15/hr" autoComplete="off" />
+      <button type="submit" class="btn-ghost">Propose</button>
+      <button type="button" class="link-btn" id="chat-rate-propose-cancel">Cancel</button>
+    </form>`;
+  document.getElementById("chat-rate-input").focus();
+  document.getElementById("chat-rate-propose-cancel").addEventListener("click", () => renderRateWidget(chat));
+  document.getElementById("chat-rate-propose-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const rate = document.getElementById("chat-rate-input").value.trim();
+    if (!rate) return;
+    await proposeRate(chat.id, rate);
+    await addMessage(chat.id, `${me.name} proposed an hourly rate of ${rate}.`, null, true);
+    renderRateWidget(chat);
+    renderMessages(chat.id);
+  });
+}
+
+async function handleAcceptRate(chat) {
+  const agreement = await acceptRate(chat.id);
+  await addMessage(chat.id, `${me.name} accepted the hourly rate of ${agreement.rate}.`, null, true);
+  renderRateWidget(chat);
+  renderMessages(chat.id);
+}
+
+async function renderChatList() {
+  const chats = await getMyChats();
   const list = document.getElementById("chat-list");
 
   if (chats.length === 0) {
@@ -684,27 +721,28 @@ function renderChatList() {
   }
 
   let totalUnread = 0;
-  list.innerHTML = chats
-    .map((chat) => {
+  const rows = await Promise.all(
+    chats.map(async (chat) => {
       const partnerEmail = otherPartyEmail(chat, me.email);
-      const partnerName = formatName(partnerEmail);
-      const msgs = getMessagesForChat(chat.id);
+      const partnerName = otherPartyName(chat, me.email) || partnerEmail;
+      const msgs = await getMessagesForChat(chat.id);
       const last = msgs[msgs.length - 1];
       const preview = last ? (last.attachment ? `📎 ${last.attachment.name}` : last.text) : "No messages yet";
       const accentColor = subjectColor(chat.subject);
-      const unread = chat.id === activeChatId ? 0 : getUnreadCountForChat(me.email, chat.id);
+      const unread = chat.id === activeChatId ? 0 : await getUnreadCountForChat(me.email, chat.id);
       totalUnread += unread;
       return `
         <button class="chat-list-item ${chat.id === activeChatId ? "active" : ""}" data-chat-id="${chat.id}" style="--accent-color:${accentColor}">
           <span class="chat-avatar" style="background:${colorForPerson(partnerEmail)}">${initials(partnerName)}</span>
           <span class="chat-list-item-body">
-            <span class="chat-list-item-name">${partnerName}</span>
+            <span class="chat-list-item-name">${escapeHtml(partnerName)}</span>
             <span class="chat-list-item-preview"><span class="chip-dot" style="background:${accentColor}"></span>${escapeHtml(preview)}</span>
           </span>
           ${unread ? `<span class="chat-list-item-unread">${unread}</span>` : ""}
         </button>`;
     })
-    .join("");
+  );
+  list.innerHTML = rows.join("");
 
   list.querySelectorAll(".chat-list-item").forEach((btn) => {
     btn.addEventListener("click", () => openChat(btn.dataset.chatId));
@@ -720,33 +758,33 @@ function renderChatsTabBadge(totalUnread) {
   badge.style.display = totalUnread ? "inline-block" : "none";
 }
 
-function openChat(chatId) {
+async function openChat(chatId) {
   activeChatId = chatId;
-  const chat = getChatById(chatId);
+  const chat = await getChatById(chatId);
   if (!chat) return;
 
   document.getElementById("chat-empty").style.display = "none";
   document.getElementById("chat-active").style.display = "flex";
 
-  const partnerEmail = otherPartyEmail(chat, me.email);
   const accentColor = subjectColor(chat.subject);
-  document.getElementById("chat-partner-name").textContent = formatName(partnerEmail);
+  document.getElementById("chat-partner-name").textContent = otherPartyName(chat, me.email) || otherPartyEmail(chat, me.email);
   const subjectEl = document.getElementById("chat-subject");
   subjectEl.textContent = chat.subject || "General tutoring";
   subjectEl.style.background = `${accentColor}22`;
   subjectEl.style.color = accentColor;
   document.getElementById("chat-thread-head").style.setProperty("--accent-color", accentColor);
   document.getElementById("schedule-btn").style.display = me.role === "tutor" ? "inline-block" : "none";
-  renderAgreedRate(chat);
+  renderRateWidget(chat);
 
   markChatRead(me.email, chatId);
   renderChatList();
   renderMessages(chatId);
 }
 
-function renderMessages(chatId) {
+async function renderMessages(chatId) {
   if (chatId !== activeChatId) return;
-  const messages = getMessagesForChat(chatId);
+  const messages = await getMessagesForChat(chatId);
+  if (chatId !== activeChatId) return; // could have switched chats while awaiting
   const container = document.getElementById("chat-messages");
 
   container.innerHTML = messages
@@ -785,17 +823,18 @@ function renderMessages(chatId) {
   container.scrollTop = container.scrollHeight;
 }
 
-function handleSendMessage(e) {
+async function handleSendMessage(e) {
   e.preventDefault();
   if (!activeChatId) return;
   const input = document.getElementById("message-input");
   const text = input.value.trim();
   if (!text && !pendingAttachment) return;
 
-  addMessage(activeChatId, me.email, text, pendingAttachment);
+  const chatId = activeChatId;
+  await addMessage(chatId, text, pendingAttachment);
   input.value = "";
   clearAttachment();
-  renderMessages(activeChatId);
+  renderMessages(chatId);
   renderChatList();
 }
 
@@ -872,15 +911,16 @@ function candidateSubtitle(profile) {
 }
 
 // Only a tutee calls this — they're the one choosing a tutor to chat with.
-function startChatWith(tutorEmail) {
-  const myProfile = getProfile(me.email);
-  const tutorProfile = getProfile(tutorEmail);
+async function startChatWith(tutorEmail) {
+  const myProfile = await getMyProfile();
+  const { profile: tutorProfile } = await getProfileByEmail(tutorEmail);
   const shared = myProfile.subjects.find((s) => tutorProfile.subjects.includes(s));
   const subject = shared || myProfile.subjects[0] || tutorProfile.subjects[0] || "General tutoring";
-  const isNewChat = !findChat(tutorEmail, me.email);
-  const chat = createChat(tutorEmail, me.email, subject);
+  const existingChats = await getMyChats();
+  const isNewChat = !existingChats.some((c) => c.tutorEmail === tutorEmail);
+  const chat = await createChat(tutorEmail, subject);
   if (isNewChat && myProfile.offer) {
-    addMessage(chat.id, me.email, `${me.name} offered ${myProfile.offer} for tutoring — reply here to agree on a rate.`, null, true);
+    await addMessage(chat.id, `${me.name} offered ${myProfile.offer} for tutoring — reply here to agree on a rate.`, null, true);
   }
   window.goToTab("chats");
   openChat(chat.id);
@@ -949,12 +989,12 @@ function openCandidateProfileModal(user, profile) {
   // Feedback: tutees can leave (and see) comments about a tutor.
   renderCandidateComments(user.email);
   document.getElementById("candidate-comment-hint").textContent = "";
-  document.getElementById("candidate-comment-form").onsubmit = (e) => {
+  document.getElementById("candidate-comment-form").onsubmit = async (e) => {
     e.preventDefault();
     const input = document.getElementById("candidate-comment-input");
     const text = input.value.trim();
     if (!text) return;
-    addComment(user.email, me.email, text);
+    await addComment(user.email, text);
     input.value = "";
     document.getElementById("candidate-comment-hint").textContent = "Thanks — this is shared with the program coordinator.";
     renderCandidateComments(user.email);
@@ -963,14 +1003,14 @@ function openCandidateProfileModal(user, profile) {
   toggleModal("candidate-profile-modal", true);
 }
 
-function renderCandidateComments(tutorEmail) {
-  const comments = getVisibleCommentsForTutor(tutorEmail);
+async function renderCandidateComments(tutorEmail) {
+  const comments = await getVisibleCommentsForTutor(tutorEmail);
   document.getElementById("candidate-profile-comments-list").innerHTML = comments.length
     ? comments
         .map(
           (c) => `
       <div class="tutor-comment-row">
-        <span class="tutor-comment-author">${escapeHtml(formatName(c.authorEmail))}</span>
+        <span class="tutor-comment-author">${escapeHtml(c.authorName || c.authorEmail)}</span>
         <span class="tutor-comment-date">${formatDateTime(c.createdAt)}</span>
         <p class="tutor-comment-text">${escapeHtml(c.text)}</p>
       </div>`
@@ -979,22 +1019,20 @@ function renderCandidateComments(tutorEmail) {
     : `<p class="chat-list-empty">No feedback yet — be the first!</p>`;
 }
 
-function renderMatchingList() {
+async function renderMatchingList() {
   const listEl = document.getElementById("matching-list");
   const legendEl = document.getElementById("matching-legend-text");
   if (!listEl || me.role !== "tutee") return;
 
-  const tutors = getUsers().filter((u) => u.role === "tutor");
-  const myProfile = getProfile(me.email);
+  const [tutorPairs, myProfile, myChats] = await Promise.all([getAllTutors(), getMyProfile(), getMyChats()]);
 
   // Only tutors qualified to teach at least one class this tutee needs — the
   // tutee's "classes need help with" and the tutor's "classes can teach"
   // lists actually overlap.
-  const matched = tutors
-    .map((u) => {
-      const profile = getProfile(u.email);
-      const shared = myProfile.subjects.filter((s) => profile.subjects.includes(s));
-      return { user: u, profile, shared };
+  const matched = tutorPairs
+    .map(({ user, profile }) => {
+      const shared = myProfile.subjects.filter((s) => (profile.subjects || []).includes(s));
+      return { user, profile, shared };
     })
     .filter((m) => m.shared.length > 0);
 
@@ -1003,7 +1041,7 @@ function renderMatchingList() {
   const sortValue = document.getElementById("matching-sort-filter").value;
   const filtered = matched.filter((m) => {
     const deptOk = !deptValue || m.shared.some((label) => categoryForLabel(label) === deptValue);
-    const availOk = !availValue || m.profile.availability.some((a) => a.endsWith(availValue));
+    const availOk = !availValue || (m.profile.availability || []).some((a) => a.endsWith(availValue));
     return deptOk && availOk;
   });
 
@@ -1026,7 +1064,7 @@ function renderMatchingList() {
     <div class="matching-stat"><span class="matching-stat-num">${departmentCount}</span><span class="matching-stat-label">Departments</span></div>
   `;
 
-  if (tutors.length === 0) {
+  if (tutorPairs.length === 0) {
     listEl.innerHTML = `<p class="chat-list-empty">No tutors have signed up yet. Check back soon.</p>`;
     return;
   }
@@ -1050,7 +1088,7 @@ function renderMatchingList() {
         )
         .join("");
       const subtitle = candidateSubtitle(profile);
-      const existingChat = findChat(u.email, me.email);
+      const existingChat = myChats.some((c) => c.tutorEmail === u.email);
       const accentColor = subjectColor(shared[0]);
       return `
         <div class="match-row" style="--accent-color:${accentColor}">
@@ -1099,13 +1137,14 @@ function initScheduleTab() {
   document.getElementById("schedule-tab-form").addEventListener("submit", handleScheduleTabSubmit);
 }
 
-function populateScheduleTuteeSelect(preselectEmail) {
+async function populateScheduleTuteeSelect(preselectEmail) {
   const select = document.getElementById("schedule-tutee-select");
   if (!select) return;
   const priorValue = preselectEmail || select.value;
 
-  const chats = getChatsForUser(me.email);
+  const chats = await getMyChats();
   const tuteeEmails = chats.map((c) => otherPartyEmail(c, me.email));
+  const nameByEmail = new Map(chats.map((c) => [otherPartyEmail(c, me.email), otherPartyName(c, me.email)]));
 
   if (tuteeEmails.length === 0) {
     select.innerHTML = `<option value="">No matched tutees yet — visit the Matching tab first</option>`;
@@ -1115,21 +1154,21 @@ function populateScheduleTuteeSelect(preselectEmail) {
 
   select.disabled = false;
   select.innerHTML = tuteeEmails
-    .map((email) => `<option value="${email}">${escapeHtml(formatName(email))}</option>`)
+    .map((email) => `<option value="${email}">${escapeHtml(nameByEmail.get(email) || email)}</option>`)
     .join("");
 
   if (priorValue && tuteeEmails.includes(priorValue)) select.value = priorValue;
 }
 
-function goToScheduleForActiveChat() {
-  const chat = getChatById(activeChatId);
+async function goToScheduleForActiveChat() {
+  const chat = await getChatById(activeChatId);
   if (!chat) return;
   const tuteeEmail = otherPartyEmail(chat, me.email);
   window.goToTab("schedule");
   populateScheduleTuteeSelect(tuteeEmail);
 }
 
-function handleScheduleTabSubmit(e) {
+async function handleScheduleTabSubmit(e) {
   e.preventDefault();
   const tuteeEmail = document.getElementById("schedule-tutee-select").value;
   const date = document.getElementById("schedule-tab-date").value;
@@ -1157,23 +1196,22 @@ function handleScheduleTabSubmit(e) {
     return;
   }
 
-  const chat = findChat(me.email, tuteeEmail);
+  const chats = await getMyChats();
+  const chat = chats.find((c) => c.tutorEmail === me.email && c.tuteeEmail === tuteeEmail);
   if (!chat) {
     errorEl.textContent = "Couldn't find a chat with that tutee.";
     return;
   }
 
-  const session = createSession({
-    chatId: chat.id,
-    tutorEmail: chat.tutorEmail,
-    tuteeEmail: chat.tuteeEmail,
-    subject: chat.subject,
-    datetime: datetime.toISOString(),
-    durationMinutes: duration,
-    zoomLink,
-  });
+  let session;
+  try {
+    session = await createSession({ chatId: chat.id, datetime: datetime.toISOString(), durationMinutes: duration, zoomLink });
+  } catch (err) {
+    errorEl.textContent = err.message;
+    return;
+  }
 
-  addMessage(chat.id, me.email, `Session scheduled for ${formatDateTime(session.datetime)} (${duration} min).`, null, true);
+  await addMessage(chat.id, `Session scheduled for ${formatDateTime(session.datetime)} (${duration} min).`, null, true);
 
   document.getElementById("schedule-tab-form").reset();
   renderScheduleUpcoming();
@@ -1181,18 +1219,18 @@ function handleScheduleTabSubmit(e) {
   renderChatList();
 }
 
-function renderScheduleUpcoming() {
+async function renderScheduleUpcoming() {
   const list = document.getElementById("schedule-upcoming-list");
   if (!list) return;
-  const sessions = getSessionsForUser(me.email);
+  const sessions = await getMySessions();
   list.innerHTML = sessionListHtml(sessions);
   wireSessionButtons(list);
 }
 
 // ---------------- Sessions sidebar ----------------
 
-function renderSessions() {
-  const sessions = getSessionsForUser(me.email);
+async function renderSessions() {
+  const sessions = await getMySessions();
   const list = document.getElementById("sessions-list");
   list.innerHTML = sessionListHtml(sessions);
   wireSessionButtons(list);
@@ -1206,16 +1244,17 @@ function sessionListHtml(sessions) {
   const now = Date.now();
   return sessions
     .map((s) => {
-      const partnerEmail = otherPartyEmail(s, me.email);
+      const partnerName = otherPartyName(s, me.email) || otherPartyEmail(s, me.email);
       const start = new Date(s.datetime).getTime();
       const joinOpensAt = start - 5 * 60000;
       const end = start + s.durationMinutes * 60000 + 15 * 60000;
       const cancelled = s.status === "cancelled";
+      const cancelledByName = s.cancelledBy === s.tutorEmail ? s.tutorName : s.tuteeName;
 
       let statusHtml;
       if (cancelled) {
         statusHtml = `<span class="session-countdown session-cancelled-label">Cancelled${
-          s.cancelledBy === me.email ? " by you" : s.cancelledBy ? ` by ${escapeHtml(formatName(s.cancelledBy))}` : ""
+          s.cancelledBy === me.email ? " by you" : cancelledByName ? ` by ${escapeHtml(cancelledByName)}` : ""
         }</span>`;
       } else if (now < joinOpensAt) {
         statusHtml = `<span class="session-countdown">${countdownText(start - now)}</span>`;
@@ -1234,23 +1273,23 @@ function sessionListHtml(sessions) {
               <button type="button" class="link-btn session-zoom-copy" data-zoom-link="${escapeHtml(s.zoomLink)}">Copy</button>
               ${
                 me.email === s.tutorEmail
-                  ? `<button type="button" class="link-btn session-zoom-edit" data-session-id="${s.id}" data-zoom-link="${escapeHtml(s.zoomLink)}">Edit</button>`
+                  ? `<button type="button" class="link-btn session-zoom-edit" data-session-id="${s.id}" data-chat-id="${s.chatId}" data-zoom-link="${escapeHtml(s.zoomLink)}">Edit</button>`
                   : ""
               }
             </div>`;
         } else if (me.email === s.tutorEmail) {
-          zoomHtml = `<button type="button" class="link-btn session-zoom-edit" data-session-id="${s.id}" data-zoom-link="">+ Add Zoom Link</button>`;
+          zoomHtml = `<button type="button" class="link-btn session-zoom-edit" data-session-id="${s.id}" data-chat-id="${s.chatId}" data-zoom-link="">+ Add Zoom Link</button>`;
         }
       }
 
       const cancelHtml =
         !cancelled && now < end
-          ? `<button type="button" class="link-btn session-cancel" data-session-id="${s.id}">Cancel Session</button>`
+          ? `<button type="button" class="link-btn session-cancel" data-session-id="${s.id}" data-chat-id="${s.chatId}" data-datetime="${s.datetime}">Cancel Session</button>`
           : "";
 
       return `
         <div class="session-card ${cancelled ? "session-card-cancelled" : ""}" style="--accent-color:${subjectColor(s.subject)}">
-          <span class="session-partner">${formatName(partnerEmail)}</span>
+          <span class="session-partner">${escapeHtml(partnerName)}</span>
           <span class="session-subject">${escapeHtml(s.subject || "General tutoring")}</span>
           <span class="session-time">${formatDateTime(s.datetime)} · ${s.durationMinutes} min</span>
           ${statusHtml}
@@ -1268,7 +1307,7 @@ function wireSessionButtons(container) {
     });
   });
   container.querySelectorAll(".session-cancel").forEach((btn) => {
-    btn.addEventListener("click", () => handleCancelSession(btn.dataset.sessionId));
+    btn.addEventListener("click", () => handleCancelSession(btn.dataset.sessionId, btn.dataset.chatId, btn.dataset.datetime));
   });
   container.querySelectorAll(".session-zoom-copy").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1290,34 +1329,31 @@ function wireSessionButtons(container) {
     });
   });
   container.querySelectorAll(".session-zoom-edit").forEach((btn) => {
-    btn.addEventListener("click", () => handleEditZoomLink(btn.dataset.sessionId, btn.dataset.zoomLink));
+    btn.addEventListener("click", () => handleEditZoomLink(btn.dataset.sessionId, btn.dataset.chatId, btn.dataset.zoomLink));
   });
 }
 
 // Cancellation is a status flip (not a delete) so both people keep a record.
 // The other party is "notified" the same way every other session update is
 // communicated here — a system message dropped into their shared chat.
-function handleCancelSession(sessionId) {
-  const session = getSessionById(sessionId);
-  if (!session) return;
+async function handleCancelSession(sessionId, chatId, datetime) {
   if (!confirm("Cancel this session? The other person will see this in your chat.")) return;
 
-  cancelSession(sessionId, me.email);
-  const chat = getChatById(session.chatId);
-  if (chat) {
-    addMessage(chat.id, me.email, `${me.name} cancelled the session scheduled for ${formatDateTime(session.datetime)}.`, null, true);
+  await cancelSession(sessionId);
+  if (chatId) {
+    await addMessage(chatId, `${me.name} cancelled the session scheduled for ${formatDateTime(datetime)}.`, null, true);
   }
 
   renderSessions();
   renderScheduleUpcoming();
   renderChatList();
-  if (activeChatId === session.chatId) renderMessages(session.chatId);
+  if (activeChatId === chatId) renderMessages(chatId);
 }
 
 // Zoom link editing after scheduling — not just at creation time — plus a
 // basic URL sanity check. Posts a system message so a link change counts as
 // an "essential session update" the other party sees, same as cancellation.
-function handleEditZoomLink(sessionId, currentLink) {
+async function handleEditZoomLink(sessionId, chatId, currentLink) {
   const value = prompt("Zoom link for this session:", currentLink || "");
   if (value === null) return;
   const trimmed = value.trim();
@@ -1326,16 +1362,19 @@ function handleEditZoomLink(sessionId, currentLink) {
     return;
   }
 
-  const session = updateSessionZoomLink(sessionId, trimmed);
-  if (!session) return;
-  const chat = getChatById(session.chatId);
-  if (chat) {
-    addMessage(chat.id, me.email, trimmed ? `Zoom link updated: ${trimmed}` : "Zoom link removed.", null, true);
+  try {
+    await updateSessionZoomLink(sessionId, trimmed);
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+  if (chatId) {
+    await addMessage(chatId, trimmed ? `Zoom link updated: ${trimmed}` : "Zoom link removed.", null, true);
   }
 
   renderSessions();
   renderScheduleUpcoming();
-  if (activeChatId === session.chatId) renderMessages(session.chatId);
+  if (activeChatId === chatId) renderMessages(chatId);
 }
 
 function countdownText(ms) {
