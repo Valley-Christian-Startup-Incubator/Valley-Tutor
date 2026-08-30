@@ -11,6 +11,8 @@ export function sessionRowToJson(row: Record<string, unknown>, names?: Map<strin
     durationMinutes: row.duration_minutes,
     zoomLink: row.zoom_link,
     status: row.status,
+    rate: row.rate,
+    proposedBy: row.proposed_by,
     cancelledBy: row.cancelled_by,
     cancelledAt: row.cancelled_at,
     createdAt: row.created_at,

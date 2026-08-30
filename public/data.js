@@ -428,15 +428,6 @@ async function getSessionById(id) {
   return authFetchJson(`/api/sessions/${id}`);
 }
 
-async function createSession({ chatId, datetime, durationMinutes, zoomLink }) {
-  const session = await authFetchJson("/api/sessions", {
-    method: "POST",
-    body: JSON.stringify({ chatId, datetime, durationMinutes, zoomLink }),
-  });
-  notifyUpdate("session");
-  return session;
-}
-
 // Cancellation is a status flip, not a delete — a cancelled session stays
 // visible (marked as such) instead of vanishing, so both sides retain a
 // record of it.
@@ -455,28 +446,27 @@ async function updateSessionZoomLink(sessionId, zoomLink) {
   return session;
 }
 
-// ---------- Rate agreements ----------
-// Either party can propose; the *other* party accepts — recorded on the
-// server (see app/api/chats/[chatId]/rate-agreement/*) so it can be pulled
-// into an admin view later.
+// ---------- Booking (mutual: tutee books an open slot + a rate together,
+// the tutor accepts both in one action — never "scheduled"/"agreed" from a
+// single side; see app/api/chats/[chatId]/session-proposals) ----------
 
-async function getRateAgreement(chatId) {
-  return authFetchJson(`/api/chats/${chatId}/rate-agreement`);
+async function getBookingInfo(chatId) {
+  return authFetchJson(`/api/chats/${chatId}/booking-info`);
 }
 
-async function proposeRate(chatId, rate) {
-  const agreement = await authFetchJson(`/api/chats/${chatId}/rate-agreement/propose`, {
+async function proposeSession(chatId, { datetime, durationMinutes, rate, zoomLink }) {
+  const session = await authFetchJson(`/api/chats/${chatId}/session-proposals`, {
     method: "POST",
-    body: JSON.stringify({ rate }),
+    body: JSON.stringify({ datetime, durationMinutes, rate, zoomLink }),
   });
-  notifyUpdate("rateAgreement");
-  return agreement;
+  notifyUpdate("session");
+  return session;
 }
 
-async function acceptRate(chatId) {
-  const agreement = await authFetchJson(`/api/chats/${chatId}/rate-agreement/accept`, { method: "POST" });
-  notifyUpdate("rateAgreement");
-  return agreement;
+async function acceptSession(sessionId) {
+  const session = await authFetchJson(`/api/sessions/${sessionId}/accept`, { method: "POST" });
+  notifyUpdate("session");
+  return session;
 }
 
 // ---------- Comments (tutee feedback on tutors) ----------

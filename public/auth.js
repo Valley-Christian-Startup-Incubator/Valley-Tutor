@@ -34,9 +34,20 @@ document.querySelectorAll(".toggle-visibility").forEach((btn) => {
   });
 });
 
-document.getElementById("forgot-password").addEventListener("click", () => {
+document.getElementById("forgot-password").addEventListener("click", async () => {
+  const email = prompt("Enter your school email to receive a password reset link:");
+  if (!email) return;
   clearAlerts();
-  showSuccess("This is a local prototype, so password resets aren't wired up yet. Try creating a new account instead.");
+  try {
+    await fetch("/api/auth/request-password-reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+  } catch {
+    // fall through to the same message either way — never reveal whether the email exists
+  }
+  showSuccess("If that email has an account, a reset link is on its way. Check your inbox.");
 });
 
 // ---------------- Signup: photo + intro video uploads ----------------

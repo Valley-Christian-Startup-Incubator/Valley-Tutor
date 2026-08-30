@@ -19,27 +19,39 @@ export function profileRowToJson(row: Record<string, unknown>) {
     tutoringHours: row.tutoring_hours,
     paymentMethods: row.payment_methods,
     paymentHandle: row.payment_handle,
+    resume: row.resume,
   };
 }
 
+const PROFILE_FIELD_MAP: Record<string, string> = {
+  photo: "photo",
+  bio: "bio",
+  classYear: "class_year",
+  takenCourses: "taken_courses",
+  subjects: "subjects",
+  gradeLevel: "grade_level",
+  gradeLevels: "grade_levels",
+  availability: "availability",
+  availabilityLocations: "availability_locations",
+  availabilityFormats: "availability_formats",
+  introVideo: "intro_video",
+  rate: "rate",
+  offer: "offer",
+  tutoringHours: "tutoring_hours",
+  paymentMethods: "payment_methods",
+  paymentHandle: "payment_handle",
+  resume: "resume",
+};
+
+// A genuine partial patch — only columns whose camelCase key is actually
+// present in the request body get touched. This matters once the profile
+// is split across separate Profile/Subjects/Availability tabs (each saves
+// independently): if this defaulted missing fields to "", saving from one
+// tab would silently wipe out data owned by the others.
 export function profileJsonToRow(body: Record<string, unknown>) {
-  return {
-    photo: body.photo ?? "",
-    bio: body.bio ?? "",
-    class_year: body.classYear ?? "",
-    taken_courses: body.takenCourses ?? [],
-    subjects: body.subjects ?? [],
-    grade_level: body.gradeLevel ?? "",
-    grade_levels: body.gradeLevels ?? [],
-    availability: body.availability ?? [],
-    availability_locations: body.availabilityLocations ?? {},
-    availability_formats: body.availabilityFormats ?? {},
-    intro_video: body.introVideo ?? "",
-    rate: body.rate ?? "",
-    offer: body.offer ?? "",
-    tutoring_hours: body.tutoringHours ?? "",
-    payment_methods: body.paymentMethods ?? [],
-    payment_handle: body.paymentHandle ?? "",
-    updated_at: new Date().toISOString(),
-  };
+  const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const [jsonKey, column] of Object.entries(PROFILE_FIELD_MAP)) {
+    if (jsonKey in body) row[column] = body[jsonKey];
+  }
+  return row;
 }

@@ -167,8 +167,61 @@
   }
 }
 
-.profile-col-left,
-.profile-col-right {
+.profile-grid-single {
+  display: block;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.tab-badge-alert {
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  vertical-align: super;
+}
+
+.setup-nudge {
+  background: var(--sky-soft);
+  color: var(--navy-dark);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  margin-bottom: 20px;
+}
+
+.sticky-save-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 14px 0;
+  background: linear-gradient(to top, var(--white) 60%, transparent);
+}
+
+.save-confirm {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--success);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.save-confirm.show {
+  opacity: 1;
+}
+
+.resume-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.profile-col-left {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -212,7 +265,6 @@
 
 .profile-save-btn {
   max-width: 220px;
-  margin-top: 24px;
 }
 
 .profile-field {
@@ -419,8 +471,11 @@
   gap: 2px;
 }
 
-.avail-cell-check,
-.avail-cell-label {
+/* Specificity note: `.avail-cell span` above (class+type) already outranks a
+   plain `.avail-cell-check`/`.avail-cell-label` class selector, so hiding
+   them by default needs the extra `.avail-cell` prefix to actually win. */
+.avail-cell .avail-cell-check,
+.avail-cell .avail-cell-label {
   display: none;
 }
 
@@ -996,6 +1051,12 @@
   gap: 6px;
 }
 
+.match-no-overlap {
+  font-size: 11.5px;
+  color: #a15a1f;
+  margin-top: 2px;
+}
+
 .match-subject-chip {
   display: inline-flex;
   align-items: center;
@@ -1464,6 +1525,51 @@
   font-size: 12.5px;
 }
 
+.chat-booking-form {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  max-width: 420px;
+  gap: 10px;
+}
+
+.chat-booking-form select,
+.chat-booking-form input {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1.5px solid #dfe3e6;
+  border-radius: 8px;
+  color: var(--navy-dark);
+  background: var(--white);
+}
+
+.chat-booking-form select:focus,
+.chat-booking-form input:focus {
+  outline: none;
+  border-color: var(--sky);
+  box-shadow: 0 0 0 3px rgba(140, 210, 244, 0.35);
+}
+
+.booking-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.booking-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.booking-form-actions button[type="submit"] {
+  max-width: none;
+  padding: 7px 16px;
+  font-size: 13px;
+}
+
 .chat-list-item-unread {
   flex: none;
   min-width: 16px;
@@ -1695,7 +1801,8 @@
   color: var(--gray);
 }
 
-.session-join {
+.session-join,
+.session-accept {
   margin-top: 8px;
   max-width: none;
   padding: 9px 0;
