@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { hashPassword, issueAuthToken } from "@/lib/auth";
+import { getAdminEmails } from "@/lib/admin";
 
 const EMPTY_PROFILE_DEFAULTS = {
   photo: "",
@@ -34,7 +35,9 @@ export async function POST(req: NextRequest) {
   }
   const ALLOWED_DOMAINS = ["@warriorlife.net", "@vcs.net"];
   const normalizedForDomainCheck = email.trim().toLowerCase();
-  if (!ALLOWED_DOMAINS.some((domain) => normalizedForDomainCheck.endsWith(domain))) {
+  const isAllowedDomain = ALLOWED_DOMAINS.some((domain) => normalizedForDomainCheck.endsWith(domain));
+  const isAllowlistedAdmin = getAdminEmails().includes(normalizedForDomainCheck);
+  if (!isAllowedDomain && !isAllowlistedAdmin) {
     return NextResponse.json(
       { error: "Use your @warriorlife.net or @vcs.net school email to sign up." },
       { status: 400 }
