@@ -2,17 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveAuthToken } from "@/lib/auth";
 import { getChatIfParticipant } from "@/lib/chats";
+import { messageRowToJson } from "@/lib/messages";
 
-function messageRowToJson(row: Record<string, unknown>) {
-  return {
-    id: row.id,
-    chatId: row.chat_id,
-    sender: row.sender,
-    text: row.text,
-    attachment: row.attachment,
-    system: row.system,
-    timestamp: row.created_at,
-  };
+// Client-side already restricts this (handleFileSelect in app.js), but that
+// alone isn't a real boundary — anyone can call this API directly.
+const ALLOWED_ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg"];
+const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024;
+
+function attachmentError(attachment: { name?: string; dataUrl?: string } | null | undefined): string | null {
+  if (!attachment) return null;
+  const name = (attachment.name || "").toLowerCase();
+  if (!ALLOWED_ATTACHMENT_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+    return "Only PDF, DOC/DOCX, PNG, and JPG files are allowed.";
+  }
+  const base64Length = (attachment.dataUrl || "").split(",")[1]?.length || 0;
+  const approxBytes = base64Length * 0.75;
+  if (approxBytes > MAX_ATTACHMENT_BYTES) {
+    return "That file is too big (3MB max).";
+  }
+  return null;
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ chatId: string }> }) {
@@ -47,6 +55,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
   const body = await req.json().catch(() => null);
   if (!body || (!body.text && !body.attachment)) {
     return NextResponse.json({ error: "A message needs text or an attachment." }, { status: 400 });
+  }
+  const attachmentIssue = attachmentError(body.attachment);
+  if (attachmentIssue) {
+    return NextResponse.json({ error: attachmentIssue }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();

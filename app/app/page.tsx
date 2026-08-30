@@ -226,6 +226,9 @@ export default function AppPage() {
                 <p id="chat-empty-text">Select a chat to get going.</p>
               </div>
               <div id="chat-active" className="chat-active" style={{ display: "none" }}>
+                <p className="safety-banner">
+                  School rules apply here &middot; Report reaches Mr. Machado and Ms. Way &middot; Reported conversations can be reviewed
+                </p>
                 <div className="chat-thread-head" id="chat-thread-head">
                   <div>
                     <h2 id="chat-partner-name"></h2>
@@ -242,7 +245,7 @@ export default function AppPage() {
                       <path d="M21.4 11.6 12.6 20.4a4.5 4.5 0 0 1-6.4-6.4l9-8.9a3 3 0 0 1 4.2 4.2L10.5 18a1.5 1.5 0 0 1-2.1-2.1l7.8-7.8" />
                     </svg>
                   </button>
-                  <input type="file" id="file-input" hidden />
+                  <input type="file" id="file-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" hidden />
                   <input type="text" id="message-input" placeholder="Type a message…" autoComplete="off" />
                   <button type="submit" className="btn-primary composer-send">Send</button>
                 </form>

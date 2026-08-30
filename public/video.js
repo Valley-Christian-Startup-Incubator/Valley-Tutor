@@ -20,6 +20,20 @@ async function init() {
   document.getElementById("call-subject").textContent = session.subject || "General tutoring";
   document.getElementById("call-shell").style.display = "flex";
 
+  document.getElementById("call-report-btn").addEventListener("click", async () => {
+    const reason = prompt("What's wrong with this session? (optional, but helps staff reviewing it)");
+    if (reason === null) return;
+    try {
+      await authFetchJson("/api/reports", {
+        method: "POST",
+        body: JSON.stringify({ chatId: session.chatId, type: "video_session", targetId: session.id, reason: reason.trim() || null }),
+      });
+      alert("Reported. Mr. Machado and Ms. Way have been notified, and this session is available for them to review.");
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
   const statusEl = document.getElementById("call-status");
   const waitingOverlay = document.getElementById("waiting-overlay");
   const localVideo = document.getElementById("local-video");

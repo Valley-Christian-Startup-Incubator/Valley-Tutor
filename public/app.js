@@ -830,6 +830,9 @@ async function renderMessages(chatId) {
             ${m.text ? `<p>${escapeHtml(m.text)}</p>` : ""}
             <span class="msg-time">${formatTime(m.timestamp)}</span>
           </div>
+          <button type="button" class="msg-report-btn" data-message-id="${m.id}" data-type="${m.attachment ? "file" : "message"}" aria-label="Report this message" title="Report this message">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22V3"/></svg>
+          </button>
         </div>`;
     })
     .join("");
@@ -837,8 +840,25 @@ async function renderMessages(chatId) {
   container.querySelectorAll(".msg-image").forEach((img) => {
     img.addEventListener("click", () => openLightbox(img.src));
   });
+  container.querySelectorAll(".msg-report-btn").forEach((btn) => {
+    btn.addEventListener("click", () => handleReportMessage(btn.dataset.messageId, btn.dataset.type));
+  });
 
   container.scrollTop = container.scrollHeight;
+}
+
+async function handleReportMessage(messageId, type) {
+  const reason = prompt("What's wrong with this message? (optional, but helps staff reviewing it)");
+  if (reason === null) return;
+  try {
+    await authFetchJson("/api/reports", {
+      method: "POST",
+      body: JSON.stringify({ chatId: activeChatId, type, targetId: messageId, reason: reason.trim() || null }),
+    });
+    alert("Reported. Mr. Machado and Ms. Way have been notified, and this conversation is available for them to review.");
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 async function handleSendMessage(e) {
@@ -856,9 +876,17 @@ async function handleSendMessage(e) {
   renderChatList();
 }
 
+const ALLOWED_ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg"];
+
 function handleFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
+  const nameLower = file.name.toLowerCase();
+  if (!ALLOWED_ATTACHMENT_EXTENSIONS.some((ext) => nameLower.endsWith(ext))) {
+    alert("Only PDF, DOC/DOCX, PNG, and JPG files can be shared here.");
+    e.target.value = "";
+    return;
+  }
   const MAX_BYTES = 3 * 1024 * 1024;
   if (file.size > MAX_BYTES) {
     alert("That file is too big for this prototype (3MB max). Try a smaller file.");

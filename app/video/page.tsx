@@ -26,8 +26,14 @@ export default function VideoPage() {
             <span className="call-partner" id="call-partner-name"></span>
             <span className="call-subject" id="call-subject"></span>
           </div>
-          <span className="call-status" id="call-status">Setting up…</span>
+          <div className="call-header-right">
+            <span className="call-status" id="call-status">Setting up…</span>
+            <button type="button" className="call-report-btn" id="call-report-btn">Report This Session</button>
+          </div>
         </header>
+        <p className="safety-banner">
+          School rules apply here &middot; Report reaches Mr. Machado and Ms. Way &middot; Reported sessions can be reviewed
+        </p>
 
         <main className="call-stage">
           <video id="remote-video" className="video-slot video-slot-main" autoPlay playsInline></video>
