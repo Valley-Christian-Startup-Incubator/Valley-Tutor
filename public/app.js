@@ -60,6 +60,21 @@ function refreshAll() {
   document.getElementById("me-role-pill").textContent = me.role;
   renderHeaderAvatar();
 
+  const otherRole = me.role === "tutor" ? "tutee" : "tutor";
+  const switchRoleBtn = document.getElementById("switch-role-btn");
+  switchRoleBtn.textContent = `Switch to ${otherRole}`;
+  switchRoleBtn.addEventListener("click", async () => {
+    if (!confirm(`Switch this account to a ${otherRole}? You'll see ${otherRole}-specific fields and tabs instead.`)) return;
+    try {
+      await authFetchJson("/api/profiles/me/role", { method: "PATCH", body: JSON.stringify({ role: otherRole }) });
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    startSession(me.token, { name: me.name, email: me.email, role: otherRole });
+    window.location.href = "/app";
+  });
+
   document.getElementById("logout-btn").addEventListener("click", () => {
     clearSession();
     window.location.href = "/";
@@ -534,7 +549,10 @@ async function initProfileTab() {
         availHtml += `
           <label class="avail-cell">
             <input type="checkbox" name="availability" value="${token}" ${profile.availability.includes(token) ? "checked" : ""} />
-            <span></span>
+            <span>
+              <svg class="avail-cell-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+              <span class="avail-cell-label">Selected</span>
+            </span>
           </label>`;
       });
     });

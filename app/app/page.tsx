@@ -116,7 +116,10 @@ export default function AppPage() {
                   <div className="profile-card">
                     <div className="avail-card-head">
                       <h2>When You&apos;re Free</h2>
-                      <span className="field-hint">Tap to toggle</span>
+                      <span className="avail-legend">
+                        <span className="avail-legend-item"><span className="avail-legend-swatch avail-legend-open"></span>Open</span>
+                        <span className="avail-legend-item"><span className="avail-legend-swatch avail-legend-selected"></span>Selected</span>
+                      </span>
                     </div>
                     <div className="avail-locations" id="avail-locations"></div>
                     <div className="availability-grid" id="availability-grid"></div>
@@ -165,7 +168,10 @@ export default function AppPage() {
 
             <div className="profile-footer">
               <button className="btn-ghost app-logout" id="logout-btn">Log Out</button>
-              <span className="role-pill" id="me-role-pill"></span>
+              <span className="profile-footer-right">
+                <button type="button" className="link-btn" id="switch-role-btn"></button>
+                <span className="role-pill" id="me-role-pill"></span>
+              </span>
             </div>
           </div>
         </section>

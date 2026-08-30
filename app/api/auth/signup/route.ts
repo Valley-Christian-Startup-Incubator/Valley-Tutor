@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
   if (typeof email !== "string" || !email.includes("@")) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
+  if (!email.trim().toLowerCase().endsWith("@warriorlife.net")) {
+    return NextResponse.json({ error: "Use your @warriorlife.net school email to sign up." }, { status: 400 });
+  }
   if (typeof password !== "string" || password.length < 8) {
     return NextResponse.json({ error: "Use at least 8 characters." }, { status: 400 });
   }

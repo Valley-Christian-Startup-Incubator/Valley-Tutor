@@ -58,7 +58,7 @@ export default function LoginPage() {
 
             <div className="field" id="field-login-email">
               <label htmlFor="login-email">Email</label>
-              <input type="email" id="login-email" autoComplete="email" placeholder="you@vcs.net" />
+              <input type="email" id="login-email" autoComplete="email" placeholder="you@warriorlife.net" />
               <div className="field-error"></div>
             </div>
 
@@ -147,7 +147,7 @@ export default function LoginPage() {
 
             <div className="field" id="field-signup-email">
               <label htmlFor="signup-email">School email</label>
-              <input type="email" id="signup-email" autoComplete="email" placeholder="you@vcs.net" />
+              <input type="email" id="signup-email" autoComplete="email" placeholder="you@warriorlife.net" />
               <div className="field-hint">Use your Valley Christian school email.</div>
               <div className="field-error"></div>
             </div>

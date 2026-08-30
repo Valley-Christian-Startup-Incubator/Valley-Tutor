@@ -169,7 +169,10 @@ formLogin.addEventListener("submit", async (e) => {
     setFieldError("field-login-password", "Enter your password.");
     valid = false;
   }
-  if (!valid) return;
+  if (!valid) {
+    scrollToFirstError(formLogin);
+    return;
+  }
 
   const submitBtn = document.getElementById("login-submit");
   submitBtn.disabled = true;
@@ -229,7 +232,10 @@ formSignup.addEventListener("submit", async (e) => {
     showError("Please agree to be matched and contacted through Peer Tutoring.");
     valid = false;
   }
-  if (!valid) return;
+  if (!valid) {
+    scrollToFirstError(formSignup);
+    return;
+  }
 
   const submitBtn = document.getElementById("signup-submit");
   submitBtn.disabled = true;
@@ -245,6 +251,7 @@ formSignup.addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(data.error || "Could not create your account.");
   } catch (err) {
     setFieldError("field-signup-email", err.message);
+    scrollToFirstError(formSignup);
     submitBtn.disabled = false;
     return;
   }
@@ -274,5 +281,15 @@ formSignup.addEventListener("submit", async (e) => {
   const params = new URLSearchParams(window.location.search);
   if (params.get("tab") === "signup") {
     showTab("signup");
+  }
+  // The homepage's "Sign Up to Tutor" / "Sign Up for Tutoring" buttons both
+  // used to land on this same generic form, which defaults to the Tutor
+  // radio regardless of which button was clicked — an easy way to end up
+  // with the wrong role. A ?role= param lets each button pre-select the
+  // right one.
+  const requestedRole = params.get("role");
+  if (requestedRole === "tutor" || requestedRole === "tutee") {
+    const radio = document.getElementById(`role-${requestedRole}`);
+    if (radio) radio.checked = true;
   }
 })();

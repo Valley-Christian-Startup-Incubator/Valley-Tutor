@@ -14,12 +14,15 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabaseAdmin();
   const { data: user } = await supabase
     .from("users")
-    .select("id, name, email, role, password_hash")
+    .select("id, name, email, role, password_hash, disabled")
     .eq("email", email.trim().toLowerCase())
     .maybeSingle();
 
   if (!user || !(await verifyPassword(password, user.password_hash))) {
     return NextResponse.json({ error: "That email and password don't match an account here." }, { status: 401 });
+  }
+  if (user.disabled) {
+    return NextResponse.json({ error: "This account has been disabled. Contact your program coordinator." }, { status: 403 });
   }
 
   const token = await issueAuthToken(user.email);

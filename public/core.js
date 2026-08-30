@@ -1,5 +1,18 @@
 const SESSION_KEY = "wc_session";
 
+// Scrolls to and focuses the first invalid field in a form after a failed
+// submit, instead of leaving the user staring at a form that silently did
+// nothing (the field-level errors were already there — this just makes sure
+// people whose first bad field is below the fold actually see one).
+function scrollToFirstError(formEl) {
+  if (!formEl) return;
+  const firstBadField = formEl.querySelector(".has-error");
+  if (!firstBadField) return;
+  firstBadField.scrollIntoView({ behavior: "smooth", block: "center" });
+  const input = firstBadField.querySelector("input, textarea, select");
+  if (input) input.focus();
+}
+
 // Sessions live in sessionStorage only (per-tab), never localStorage, so two
 // tabs in the same browser can stay logged in as two different people at
 // once — e.g. a tutor and tutee demoing chat/video together. The tradeoff is

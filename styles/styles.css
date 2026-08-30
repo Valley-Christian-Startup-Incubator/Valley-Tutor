@@ -820,6 +820,10 @@ a:focus-visible {
   padding: 88px 56px;
   max-width: 1080px;
   margin: 0 auto;
+  /* .site-nav is position:sticky, so jumping to an in-page anchor (e.g. the
+     "How It Works" nav link) would otherwise scroll the section right up
+     under it, cropping the top. */
+  scroll-margin-top: 100px;
 }
 
 @media (max-width: 720px) {
@@ -978,13 +982,13 @@ a:focus-visible {
   border: 1.5px solid #eceff1;
 }
 
-.audience-card.tutor {
+.audience-card.dark {
   background: var(--navy);
   color: var(--white);
   border-color: var(--navy);
 }
 
-.audience-card.tutee {
+.audience-card.light {
   background: var(--white);
 }
 
@@ -995,11 +999,11 @@ a:focus-visible {
   font-weight: 700;
 }
 
-.audience-card.tutor .role-title {
+.audience-card.dark .role-title {
   color: var(--sky);
 }
 
-.audience-card.tutee .role-title {
+.audience-card.light .role-title {
   color: var(--navy);
 }
 
@@ -1010,11 +1014,11 @@ a:focus-visible {
   margin: 10px 0 12px;
 }
 
-.audience-card.tutor h3 {
+.audience-card.dark h3 {
   color: var(--white);
 }
 
-.audience-card.tutee h3 {
+.audience-card.light h3 {
   color: var(--navy-dark);
 }
 
@@ -1025,11 +1029,11 @@ a:focus-visible {
   line-height: 1.9;
 }
 
-.audience-card.tutor ul {
+.audience-card.dark ul {
   color: #d7e8f5;
 }
 
-.audience-card.tutee ul {
+.audience-card.light ul {
   color: #4a545c;
 }
 
@@ -1037,34 +1041,13 @@ a:focus-visible {
   width: 100%;
 }
 
-.audience-card.tutor .btn-primary.btn-link {
+.audience-card.dark .btn-primary.btn-link {
   background: var(--sky);
   color: var(--navy-dark);
 }
 
-.audience-card.tutor .btn-primary.btn-link:hover {
+.audience-card.dark .btn-primary.btn-link:hover {
   background: #a7ddf7;
-}
-
-/* Final CTA */
-
-.cta-section {
-  text-align: center;
-  padding: 90px 56px;
-}
-
-.cta-section h2 {
-  font-family: var(--font-serif);
-  font-weight: 400;
-  font-size: clamp(26px, 4vw, 38px);
-  color: var(--navy-dark);
-  margin: 0 0 14px;
-}
-
-.cta-section p {
-  color: #5b6670;
-  font-size: 15.5px;
-  margin: 0 0 30px;
 }
 
 /* Footer */
