@@ -65,7 +65,14 @@ async function init() {
   localVideo.srcObject = localStream;
 
   const isCaller = me.email === session.tutorEmail;
-  const callChannel = new BroadcastChannel(`wc_call_${sessionId}`);
+
+  // Signals over Supabase Realtime (see CallSignalBridge.tsx) instead of a
+  // plain BroadcastChannel, which only relays between tabs of the same
+  // browser — useless for a tutor and tutee on two separate real devices.
+  if (!window.createCallSignalChannel) {
+    await new Promise((resolve) => window.addEventListener("call-signal-ready", resolve, { once: true }));
+  }
+  const callChannel = window.createCallSignalChannel(sessionId);
 
   const pc = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
