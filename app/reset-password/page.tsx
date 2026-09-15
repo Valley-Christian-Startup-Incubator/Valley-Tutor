@@ -12,7 +12,9 @@ export default function ResetPasswordPage() {
       <section className="brand-panel">
         <div>
           <div className="brand-logo on-dark large">
-            <img src="/assets/vcs-lockup-white.png" alt="Valley Christian Schools" />
+            <span className="logo-chip">
+              <img src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" />
+            </span>
             <span className="program-tag">
               Peer
               <br />

@@ -11,7 +11,7 @@ export default function AccountPage() {
     <div className="app-body">
       <header className="app-topbar">
         <a href="/app" className="app-logo-link">
-          <img src="/assets/vcs-lockup-navy.png" alt="Valley Christian Schools" className="app-logo" />
+          <img src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" className="app-logo" />
         </a>
         <a href="/app" className="link-btn">&larr; Back to app</a>
       </header>

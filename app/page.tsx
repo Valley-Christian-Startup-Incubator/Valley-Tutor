@@ -3,7 +3,7 @@ export default function LandingPage() {
     <>
       <nav className="site-nav">
         <div className="brand-logo">
-          <img src="/assets/vcs-lockup-color.png" alt="Valley Christian Schools" />
+          <img src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" />
           <span className="program-tag">
             Peer
             <br />
@@ -22,9 +22,11 @@ export default function LandingPage() {
       </nav>
 
       <header className="hero">
-        <img className="hero-logo" src="/assets/vcs-lockup-white.png" alt="Valley Christian Schools" />
+        <span className="hero-logo-chip">
+          <img className="hero-logo" src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" />
+        </span>
         <p className="eyebrow">Peer Tutoring</p>
-        <h1>Every Warrior has something to teach&mdash;and something to learn.</h1>
+        <h1>Every Warrior has something to teach<br />and something to learn.</h1>
         <p className="hero-sub">
           Sign up as a tutor or tutee, get matched, and take it from there: chat, video call, and share files, all in one place.
         </p>
@@ -137,8 +139,12 @@ export default function LandingPage() {
       </section>
 
       <footer className="site-footer">
-        <img className="footer-logo" src="/assets/vcs-lockup-color-tagline.png" alt="Valley Christian Schools — Quest for Excellence" />
-        <p className="footer-meta">Peer Tutoring &middot; Local prototype, not an official VCS system</p>
+        <img className="footer-logo" src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" />
+        <div className="footer-text">
+          <p className="footer-meta">Peer Tutoring &middot; Local prototype, not an official VCS system.</p>
+          <p className="footer-meta">Student-led project by the High School BEI program, Startup Incubator.</p>
+          <p className="footer-meta">The Startup Incubator (SUI) program provides a yearlong opportunity for student teams to launch startups or nonprofits.</p>
+        </div>
       </footer>
     </>
   );

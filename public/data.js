@@ -117,6 +117,13 @@ const COURSE_CATALOG = {
     { name: "Water Polo", levels: ["Regular"] },
     { name: "Lacrosse", levels: ["Regular"] },
   ],
+  // Not a school course, same reasoning as Music/Athletics above — added at
+  // Benjamin Mull's request (marketing, 2026-09-15) so students can find/offer
+  // SAT & PSAT tutoring the same way they do for any other subject.
+  "SAT/PSAT": [
+    { name: "SAT", levels: ["Regular"] },
+    { name: "PSAT", levels: ["Regular"] },
+  ],
 };
 
 const CATEGORY_COLORS = {
@@ -127,6 +134,7 @@ const CATEGORY_COLORS = {
   "World Language": "#d98a34",
   Music: "#c2477a",
   Athletics: "#3b7dbf",
+  "SAT/PSAT": "#c99a2e",
 };
 
 function findCatalogCourse(course) {

@@ -10,7 +10,7 @@ export default function AppPage() {
             which a full navigation guarantees and client-side routing doesn't. */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href="/" className="app-logo-link">
-          <img src="/assets/vcs-lockup-navy.png" alt="Valley Christian Schools" className="app-logo" />
+          <img src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" className="app-logo" />
         </a>
         <div className="app-topbar-user">
           <span className="app-user-name" id="me-name"></span>
