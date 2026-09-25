@@ -4,6 +4,12 @@
   min-height: 100vh;
 }
 
+.call-body .safety-banner {
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
 .call-error {
   min-height: 100vh;
   display: flex;
@@ -76,6 +82,28 @@
   background: rgba(140, 210, 244, 0.12);
   padding: 6px 14px;
   border-radius: 999px;
+}
+
+.call-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.call-report-btn {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.call-report-btn:hover {
+  border-color: var(--error);
+  color: var(--error);
 }
 
 .call-stage {

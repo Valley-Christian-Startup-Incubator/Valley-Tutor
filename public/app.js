@@ -1,12 +1,60 @@
-const PANEL_NAMES = ["profile", "matching", "chats", "schedule"];
-const NAV_TAB_NAMES = ["matching", "chats", "schedule"];
+const PANEL_NAMES = ["profile", "subjects", "availability", "matching", "chats", "schedule"];
+const NAV_TAB_NAMES = ["subjects", "availability", "matching", "chats", "schedule"];
 const PERSON_COLORS = ["#2b6cb0", "#9f7aea", "#38a169", "#dd6b20", "#d53f8c", "#319795", "#c05621", "#5a67d8"];
 let activeChatId = null;
 let pendingAttachment = null;
 
 const me = requireSession("/login");
 
-if (me) {
+// Gate on the signed agreement before anything else can render — signup
+// already routes here first, but this is the actual enforcement point (also
+// catches someone who signed up, closed the tab, and logged back in later).
+// A failed status check fails OPEN (logs and lets them through) rather than
+// locking someone out over a transient network hiccup — this app doesn't
+// otherwise defend against a determined client-side bypass, so a hard lock
+// here would be inconsistent with its existing trust model, not more secure.
+async function hasSignedAgreement(email) {
+  try {
+    const res = await fetch(`/api/agreements/status?email=${encodeURIComponent(email)}`);
+    if (!res.ok) throw new Error(`status check failed: ${res.status}`);
+    const data = await res.json();
+    return Boolean(data.signed);
+  } catch (err) {
+    console.error("Agreement status check failed, letting the user through:", err);
+    return true;
+  }
+}
+
+// Re-fetches and re-renders everything data-dependent — called on the
+// same-browser BroadcastChannel nudge AND on a plain interval, since chats/
+// messages/sessions now live server-side and a tutor and tutee on two
+// separate real devices have no shared BroadcastChannel to notify each
+// other with.
+function refreshAll() {
+  if (activeChatId) {
+    markChatRead(me.email, activeChatId);
+    getChatById(activeChatId).then((chat) => {
+      if (chat) renderBookingWidget(chat);
+    });
+  }
+  renderChatList();
+  if (activeChatId) renderMessages(activeChatId);
+  renderSessions();
+  if (me.role === "tutor") {
+    renderScheduleUpcoming();
+  } else {
+    renderMatchingList();
+  }
+}
+
+(async () => {
+  if (!me) return;
+
+  if (!(await hasSignedAgreement(me.email))) {
+    window.location.href = "/sign-agreement";
+    return;
+  }
+
   document.getElementById("me-name").textContent = me.name;
   document.getElementById("me-role-pill").textContent = me.role;
   renderHeaderAvatar();
@@ -22,6 +70,8 @@ if (me) {
 
   initTabs();
   initProfileTab();
+  initSubjectsTab();
+  initAvailabilityTab();
   initChatsTab();
   if (me.role === "tutor") {
     initScheduleTab();
@@ -29,20 +79,9 @@ if (me) {
     initMatchingTab();
   }
 
-  onUpdate(() => {
-    renderChatList();
-    if (activeChatId) renderMessages(activeChatId);
-    renderSessions();
-    if (me.role === "tutor") {
-      populateScheduleTuteeSelect();
-      renderScheduleUpcoming();
-    } else {
-      renderMatchingList();
-    }
-  });
-
-  setInterval(renderSessions, 30000);
-}
+  onUpdate(refreshAll);
+  setInterval(refreshAll, 8000);
+})();
 
 // ---------------- Tabs ----------------
 
@@ -91,7 +130,6 @@ function initTabs() {
     } else if (which === "matching" && me.role === "tutee") {
       renderMatchingList();
     } else if (which === "schedule" && me.role === "tutor") {
-      populateScheduleTuteeSelect();
       renderScheduleUpcoming();
     }
   }
@@ -108,8 +146,8 @@ function initTabs() {
 
 // ---------------- Header avatar ----------------
 
-function renderHeaderAvatar() {
-  const profile = getProfile(me.email);
+async function renderHeaderAvatar() {
+  const profile = await getMyProfile();
   const img = document.getElementById("header-avatar-img");
   const initialsEl = document.getElementById("header-avatar-initials");
   if (profile.photo) {
@@ -125,9 +163,17 @@ function renderHeaderAvatar() {
 
 // ---------------- Profile tab ----------------
 
-function initProfileTab() {
+function showSaveConfirm(prefix) {
+  const el = document.getElementById(`${prefix}-save-confirm`);
+  if (!el) return;
+  el.textContent = "Saved";
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2000);
+}
+
+async function initProfileTab() {
   const isTutor = me.role === "tutor";
-  const profile = getProfile(me.email);
+  const profile = await getMyProfile();
 
   document.getElementById("profile-name-heading").textContent = me.name;
   document.getElementById("profile-subtitle").textContent = isTutor
@@ -265,6 +311,54 @@ function initProfileTab() {
     renderIntroVideoPreview(pendingIntroVideo);
   });
 
+  // Resume: optional, tutor-only, not required to match (#16) — same
+  // data-URL upload pattern as the photo/intro-video fields above.
+  document.getElementById("resume-field").style.display = isTutor ? "" : "none";
+  let pendingResume = profile.resume || "";
+  if (isTutor) renderResumePreview(pendingResume);
+
+  function renderResumePreview(dataUrl) {
+    const row = document.getElementById("resume-upload-row");
+    const link = document.getElementById("resume-download-link");
+    if (dataUrl) {
+      link.href = dataUrl;
+      row.style.display = "flex";
+    } else {
+      link.href = "#";
+      row.style.display = "none";
+    }
+  }
+
+  document.getElementById("resume-upload-btn").addEventListener("click", () => document.getElementById("resume-input").click());
+  document.getElementById("resume-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    const errorEl = document.getElementById("resume-error");
+    errorEl.textContent = "";
+    if (!file) return;
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (file.type !== "application/pdf") {
+      errorEl.textContent = "Resumes must be a PDF.";
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      errorEl.textContent = "That PDF is too big (5MB max).";
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingResume = reader.result;
+      renderResumePreview(pendingResume);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  });
+  document.getElementById("resume-remove-btn").addEventListener("click", () => {
+    pendingResume = "";
+    renderResumePreview(pendingResume);
+  });
+
   document.getElementById("rate-input").value = profile.rate || "";
   document.getElementById("tutoring-hours-input").value = profile.tutoringHours || "";
   document.getElementById("offer-input").value = profile.offer || "";
@@ -279,17 +373,17 @@ function initProfileTab() {
   ).join("");
 
   // Comments a tutor has received (warm ones only — cold feedback is held
-  // back, see data.js). Tutees don't have a comments card.
+  // back, see lib/comments.ts). Tutees don't have a comments card.
   const commentsCard = document.getElementById("tutor-comments-card");
   if (isTutor) {
     commentsCard.style.display = "block";
-    const comments = getVisibleCommentsForTutor(me.email);
+    const comments = await getVisibleCommentsForTutor(me.email);
     document.getElementById("tutor-comments-list").innerHTML = comments.length
       ? comments
           .map(
             (c) => `
         <div class="tutor-comment-row">
-          <span class="tutor-comment-author">${escapeHtml(formatName(c.authorEmail))}</span>
+          <span class="tutor-comment-author">${escapeHtml(c.authorName || c.authorEmail)}</span>
           <span class="tutor-comment-date">${formatDateTime(c.createdAt)}</span>
           <p class="tutor-comment-text">${escapeHtml(c.text)}</p>
         </div>`
@@ -299,6 +393,44 @@ function initProfileTab() {
   } else {
     commentsCard.style.display = "none";
   }
+
+  document.getElementById("profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const newProfile = {
+      photo: pendingPhoto,
+      bio: document.getElementById("bio-input").value.trim(),
+      introVideo: isTutor ? pendingIntroVideo : "",
+      resume: isTutor ? pendingResume : "",
+      rate: isTutor ? document.getElementById("rate-input").value.trim() : "",
+      tutoringHours: isTutor ? document.getElementById("tutoring-hours-input").value.trim() : "",
+      offer: isTutor ? "" : document.getElementById("offer-input").value.trim(),
+      paymentMethods: isTutor
+        ? []
+        : Array.from(document.querySelectorAll('input[name="paymentMethod"]:checked')).map((i) => i.value),
+      paymentHandle: isTutor ? "" : document.getElementById("payment-handle-input").value.trim(),
+    };
+    if (isTutor) {
+      newProfile.gradeLevels = Array.from(document.querySelectorAll('input[name="grade"]:checked')).map((i) => i.value);
+      newProfile.gradeLevel = "";
+      const checkedClassYear = document.querySelector('input[name="classYear"]:checked');
+      newProfile.classYear = checkedClassYear ? checkedClassYear.value : "";
+    } else {
+      const checked = document.querySelector('input[name="grade"]:checked');
+      newProfile.gradeLevel = checked ? checked.value : "";
+      newProfile.gradeLevels = [];
+      newProfile.classYear = "";
+    }
+    await saveMyProfile(newProfile);
+    renderHeaderAvatar();
+    showSaveConfirm("profile");
+  });
+}
+
+// ---------------- Subjects tab ----------------
+
+async function initSubjectsTab() {
+  const isTutor = me.role === "tutor";
+  const profile = await getMyProfile();
 
   // ---- Inline course browser: search + category accordions ----
   // Tutor: "Classes You've Taken" drives the qualified-to-teach dropdown.
@@ -473,78 +605,115 @@ function initProfileTab() {
 
   renderCourseBrowser();
 
-  const availabilityGrid = document.getElementById("availability-grid");
-  let availHtml = `<div class="avail-corner"></div>`;
-  AVAILABILITY_BLOCKS.forEach(
-    (b) => (availHtml += `<div class="avail-block-label">${escapeHtml(b)}<br />${ZOOM_ONLY_BLOCKS.includes(b) ? "(Zoom)" : "(on campus)"}</div>`)
-  );
-  AVAILABILITY_DAYS.forEach((day) => {
-    availHtml += `<div class="avail-day-label">${day}</div>`;
-    AVAILABILITY_BLOCKS.forEach((block) => {
-      const token = `${day}-${block}`;
-      availHtml += `
-        <label class="avail-cell">
-          <input type="checkbox" name="availability" value="${token}" ${profile.availability.includes(token) ? "checked" : ""} />
-          <span></span>
-        </label>`;
+  const hasAnySubject = isTutor ? pendingTakenCourses.length > 0 : pendingSubjects.size > 0;
+  document.getElementById("subjects-nudge").style.display = hasAnySubject ? "none" : "";
+  document.getElementById("subjects-tab-badge").style.display = hasAnySubject ? "none" : "";
+
+  document.getElementById("subjects-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const subjects = isTutor ? getTeachableCourses(pendingTakenCourses).map((c) => c.label) : Array.from(pendingSubjects);
+    await saveMyProfile({
+      subjects,
+      takenCourses: isTutor ? pendingTakenCourses.slice() : [],
     });
+    showSaveConfirm("subjects");
+    const nowHasAny = isTutor ? pendingTakenCourses.length > 0 : pendingSubjects.size > 0;
+    document.getElementById("subjects-nudge").style.display = nowHasAny ? "none" : "";
+    document.getElementById("subjects-tab-badge").style.display = nowHasAny ? "none" : "";
   });
-  availabilityGrid.innerHTML = availHtml;
+}
+
+// ---------------- Availability tab ----------------
+
+async function initAvailabilityTab() {
+  const profile = await getMyProfile();
+
+  // Format-specific availability: each block defaults to the old hardcoded
+  // assumption (Evening = Online, everything else = In-Person) for profiles
+  // saved before this existed, but is now editable per block.
+  const pendingAvailFormats = {};
+  AVAILABILITY_BLOCKS.forEach((b) => {
+    pendingAvailFormats[b] = (profile.availabilityFormats || {})[b] || (ZOOM_ONLY_BLOCKS.includes(b) ? "Online" : "In-Person");
+  });
+
+  function renderAvailabilityGrid() {
+    const availabilityGrid = document.getElementById("availability-grid");
+    let availHtml = `<div class="avail-corner"></div>`;
+    AVAILABILITY_BLOCKS.forEach((b) => {
+      const fmt = pendingAvailFormats[b];
+      const fmtText = fmt === "Both" ? "In-Person & Online" : fmt === "Online" ? "Online" : "In-Person";
+      availHtml += `<div class="avail-block-label">${escapeHtml(b)}<br />(${fmtText})</div>`;
+    });
+    AVAILABILITY_DAYS.forEach((day) => {
+      availHtml += `<div class="avail-day-label">${day}</div>`;
+      AVAILABILITY_BLOCKS.forEach((block) => {
+        const token = `${day}-${block}`;
+        availHtml += `
+          <label class="avail-cell">
+            <input type="checkbox" name="availability" value="${token}" ${profile.availability.includes(token) ? "checked" : ""} />
+            <span>
+              <svg class="avail-cell-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+              <span class="avail-cell-label">Selected</span>
+            </span>
+          </label>`;
+      });
+    });
+    availabilityGrid.innerHTML = availHtml;
+  }
 
   const availLocations = profile.availabilityLocations || {};
-  document.getElementById("avail-locations").innerHTML =
-    `<div class="avail-location-corner"></div>` +
-    AVAILABILITY_BLOCKS.map((block) => {
-      const isZoom = ZOOM_ONLY_BLOCKS.includes(block);
-      return `
-        <div class="avail-location-field">
-          <label>Location</label>
-          <input type="text" data-block="${escapeHtml(block)}" ${isZoom ? "value=\"Zoom\" disabled" : `value="${escapeHtml(availLocations[block] || "")}" placeholder="e.g. Library"`} />
-        </div>`;
-    }).join("");
+  function renderAvailLocations() {
+    document.getElementById("avail-locations").innerHTML =
+      `<div class="avail-location-corner"></div>` +
+      AVAILABILITY_BLOCKS.map((block) => {
+        const fmt = pendingAvailFormats[block];
+        const showLocation = fmt !== "Online";
+        return `
+          <div class="avail-location-field">
+            <label>Format</label>
+            <select data-format-block="${escapeHtml(block)}">
+              ${AVAILABILITY_FORMATS.map((f) => `<option value="${f}" ${fmt === f ? "selected" : ""}>${f}</option>`).join("")}
+            </select>
+            ${
+              showLocation
+                ? `<input type="text" data-block="${escapeHtml(block)}" value="${escapeHtml(availLocations[block] || "")}" placeholder="e.g. Library" />`
+                : ""
+            }
+          </div>`;
+      }).join("");
 
-  document.getElementById("profile-form").addEventListener("submit", (e) => {
+    document.querySelectorAll('#avail-locations select[data-format-block]').forEach((select) => {
+      select.addEventListener("change", () => {
+        pendingAvailFormats[select.dataset.formatBlock] = select.value;
+        renderAvailLocations();
+        renderAvailabilityGrid();
+      });
+    });
+  }
+
+  renderAvailabilityGrid();
+  renderAvailLocations();
+
+  const hasAnyAvailability = profile.availability.length > 0;
+  document.getElementById("availability-nudge").style.display = hasAnyAvailability ? "none" : "";
+  document.getElementById("availability-tab-badge").style.display = hasAnyAvailability ? "none" : "";
+
+  document.getElementById("availability-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const availability = Array.from(document.querySelectorAll('input[name="availability"]:checked')).map((i) => i.value);
     const availabilityLocations = {};
-    document.querySelectorAll("#avail-locations input[data-block]").forEach((input) => {
-      availabilityLocations[input.dataset.block] = input.disabled ? "Zoom" : input.value.trim();
+    AVAILABILITY_BLOCKS.forEach((block) => {
+      const input = document.querySelector(`#avail-locations input[data-block="${block}"]`);
+      availabilityLocations[block] = input ? input.value.trim() : "";
     });
-    const subjects = isTutor ? getTeachableCourses(pendingTakenCourses).map((c) => c.label) : Array.from(pendingSubjects);
-    const newProfile = {
-      subjects,
+    await saveMyProfile({
       availability,
       availabilityLocations,
-      photo: pendingPhoto,
-      bio: document.getElementById("bio-input").value.trim(),
-      takenCourses: isTutor ? pendingTakenCourses.slice() : [],
-      introVideo: isTutor ? pendingIntroVideo : "",
-      rate: isTutor ? document.getElementById("rate-input").value.trim() : "",
-      tutoringHours: isTutor ? document.getElementById("tutoring-hours-input").value.trim() : "",
-      offer: isTutor ? "" : document.getElementById("offer-input").value.trim(),
-      paymentMethods: isTutor
-        ? []
-        : Array.from(document.querySelectorAll('input[name="paymentMethod"]:checked')).map((i) => i.value),
-      paymentHandle: isTutor ? "" : document.getElementById("payment-handle-input").value.trim(),
-    };
-    if (isTutor) {
-      newProfile.gradeLevels = Array.from(document.querySelectorAll('input[name="grade"]:checked')).map((i) => i.value);
-      newProfile.gradeLevel = "";
-      const checkedClassYear = document.querySelector('input[name="classYear"]:checked');
-      newProfile.classYear = checkedClassYear ? checkedClassYear.value : "";
-    } else {
-      const checked = document.querySelector('input[name="grade"]:checked');
-      newProfile.gradeLevel = checked ? checked.value : "";
-      newProfile.gradeLevels = [];
-      newProfile.classYear = "";
-    }
-    saveProfile(me.email, newProfile);
-    renderHeaderAvatar();
-
-    const alertEl = document.getElementById("profile-alert");
-    alertEl.textContent = "Profile saved.";
-    alertEl.classList.add("show");
-    setTimeout(() => alertEl.classList.remove("show"), 2500);
+      availabilityFormats: pendingAvailFormats,
+    });
+    showSaveConfirm("availability");
+    document.getElementById("availability-nudge").style.display = availability.length ? "none" : "";
+    document.getElementById("availability-tab-badge").style.display = availability.length ? "none" : "";
   });
 }
 
@@ -562,7 +731,6 @@ function openLightbox(src) {
 function initChatsTab() {
   document.getElementById("chat-empty-text").textContent =
     me.role === "tutee" ? "Select a chat to get going, or visit the Matching tab to start one." : "Select a chat to get going.";
-  document.getElementById("schedule-btn").addEventListener("click", goToScheduleForActiveChat);
 
   document.getElementById("chat-composer").addEventListener("submit", handleSendMessage);
   document.getElementById("attach-btn").addEventListener("click", () => document.getElementById("file-input").click());
@@ -572,8 +740,174 @@ function initChatsTab() {
   renderSessions();
 }
 
-function renderChatList() {
-  const chats = getChatsForUser(me.email);
+// ---------------- Booking widget ----------------
+// The tutee books an open slot from the tutor's declared availability and
+// proposes a rate together, in one action; the tutor accepts both together
+// (#6: never "scheduled"/"agreed" from a single side). Decline/cancel is
+// the normal cancel flow, not a safety Report.
+
+const DAY_LABELS = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday" };
+
+async function renderBookingWidget(chat) {
+  const widget = document.getElementById("chat-rate-widget");
+  if (!widget) return;
+  const partnerName = otherPartyName(chat, me.email) || "the other person";
+  const sessions = (await getMySessions()).filter((s) => s.chatId === chat.id);
+  const relevant =
+    sessions.find((s) => s.status === "proposed") ||
+    sessions
+      .filter((s) => s.status === "accepted" && new Date(s.datetime) > new Date())
+      .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))[0];
+
+  if (!relevant) {
+    widget.innerHTML =
+      me.role === "tutee"
+        ? `<button type="button" class="btn-ghost chat-book-btn">Book a Session</button>`
+        : `<span>No session proposed yet</span>`;
+  } else if (relevant.status === "proposed" && relevant.proposedBy === me.email) {
+    widget.innerHTML = `
+      <span>Waiting for ${escapeHtml(partnerName)} to accept ${escapeHtml(formatDateTime(relevant.datetime))} at ${escapeHtml(relevant.rate)}</span>
+      <button type="button" class="link-btn chat-book-cancel-btn" data-session-id="${relevant.id}">Cancel</button>`;
+  } else if (relevant.status === "proposed") {
+    widget.innerHTML = `
+      <span>${escapeHtml(partnerName)} proposed ${escapeHtml(formatDateTime(relevant.datetime))} (${relevant.durationMinutes} min) at ${escapeHtml(relevant.rate)}</span>
+      <button type="button" class="btn-primary chat-book-accept-btn" data-session-id="${relevant.id}">Accept</button>
+      <button type="button" class="link-btn chat-book-cancel-btn" data-session-id="${relevant.id}">Decline</button>`;
+  } else {
+    widget.innerHTML = `
+      <span>✓ Session confirmed: ${escapeHtml(formatDateTime(relevant.datetime))} at ${escapeHtml(relevant.rate)}</span>
+      ${me.role === "tutee" ? `<button type="button" class="link-btn chat-book-btn">Book another</button>` : ""}`;
+  }
+
+  const bookBtn = widget.querySelector(".chat-book-btn");
+  if (bookBtn) bookBtn.addEventListener("click", () => showBookingForm(chat));
+  const acceptBtn = widget.querySelector(".chat-book-accept-btn");
+  if (acceptBtn) acceptBtn.addEventListener("click", () => handleAcceptSessionFromWidget(chat, acceptBtn.dataset.sessionId));
+  const cancelBtn = widget.querySelector(".chat-book-cancel-btn");
+  if (cancelBtn) cancelBtn.addEventListener("click", () => handleCancelSessionFromWidget(chat, cancelBtn.dataset.sessionId));
+}
+
+function nextDateForWeekday(dayAbbrev) {
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const targetIdx = days.indexOf(dayAbbrev);
+  if (targetIdx === -1) return "";
+  const today = new Date();
+  let diff = (targetIdx - today.getDay() + 7) % 7;
+  if (diff === 0) diff = 7; // today is that weekday -> suggest next week's, avoids an already-past time today
+  const result = new Date(today);
+  result.setDate(today.getDate() + diff);
+  return `${result.getFullYear()}-${String(result.getMonth() + 1).padStart(2, "0")}-${String(result.getDate()).padStart(2, "0")}`;
+}
+
+async function showBookingForm(chat) {
+  const widget = document.getElementById("chat-rate-widget");
+  const info = await getBookingInfo(chat.id);
+  const partnerName = otherPartyName(chat, me.email) || "their";
+
+  const slotOptions = (info.availability || [])
+    .map((token) => {
+      const dashIdx = token.indexOf("-");
+      const day = token.slice(0, dashIdx);
+      const block = token.slice(dashIdx + 1);
+      const fmt = (info.availabilityFormats || {})[block];
+      const location = (info.availabilityLocations || {})[block];
+      const fmtLabel = fmt === "Online" ? "Online" : fmt === "Both" ? `In-Person or Online${location ? ` · ${location}` : ""}` : `In-Person${location ? ` · ${location}` : ""}`;
+      return `<option value="${token}">${DAY_LABELS[day] || day} · ${block} (${fmtLabel})</option>`;
+    })
+    .join("");
+
+  widget.innerHTML = `
+    <form class="chat-rate-form chat-booking-form" id="chat-booking-form">
+      ${
+        slotOptions
+          ? `<select id="booking-slot-select"><option value="">Pick from ${escapeHtml(partnerName)}'s open times…</option>${slotOptions}</select>`
+          : `<p class="field-hint">${escapeHtml(partnerName)} hasn't set any availability yet — pick any time below.</p>`
+      }
+      <div class="booking-form-row">
+        <input type="date" id="booking-date-input" required />
+        <input type="time" id="booking-time-input" required />
+        <select id="booking-duration-input">
+          <option value="30">30 min</option>
+          <option value="45">45 min</option>
+          <option value="60">60 min</option>
+        </select>
+      </div>
+      <input type="text" id="booking-rate-input" placeholder="e.g. $15/hr" value="${escapeHtml(info.lastAcceptedRate || "")}" />
+      <input type="url" id="booking-zoom-input" placeholder="Zoom link (optional)" />
+      <div class="booking-form-actions">
+        <button type="submit" class="btn-primary">Propose Session</button>
+        <button type="button" class="link-btn" id="booking-cancel-btn">Cancel</button>
+      </div>
+      <div class="field-error" id="booking-error"></div>
+    </form>`;
+
+  document.getElementById("booking-cancel-btn").addEventListener("click", () => renderBookingWidget(chat));
+  const slotSelect = document.getElementById("booking-slot-select");
+  if (slotSelect) {
+    slotSelect.addEventListener("change", () => {
+      const token = slotSelect.value;
+      if (!token) return;
+      document.getElementById("booking-date-input").value = nextDateForWeekday(token.slice(0, token.indexOf("-")));
+    });
+  }
+
+  document.getElementById("chat-booking-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("booking-error");
+    errorEl.textContent = "";
+    const date = document.getElementById("booking-date-input").value;
+    const time = document.getElementById("booking-time-input").value;
+    const rate = document.getElementById("booking-rate-input").value.trim();
+    const zoomLink = document.getElementById("booking-zoom-input").value.trim();
+    if (!date || !time) {
+      errorEl.textContent = "Pick a date and time.";
+      return;
+    }
+    if (!rate) {
+      errorEl.textContent = "Enter the rate you're proposing.";
+      return;
+    }
+    const datetime = new Date(`${date}T${time}`);
+    if (Number.isNaN(datetime.getTime()) || datetime < new Date()) {
+      errorEl.textContent = "Pick a time in the future.";
+      return;
+    }
+    try {
+      const session = await proposeSession(chat.id, {
+        datetime: datetime.toISOString(),
+        durationMinutes: document.getElementById("booking-duration-input").value,
+        rate,
+        zoomLink,
+      });
+      await addMessage(chat.id, `${me.name} proposed a session for ${formatDateTime(session.datetime)} at ${rate}.`, null, true);
+      renderBookingWidget(chat);
+      renderMessages(chat.id);
+      renderSessions();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+}
+
+async function handleAcceptSessionFromWidget(chat, sessionId) {
+  const session = await acceptSession(sessionId);
+  await addMessage(chat.id, `${me.name} accepted the session for ${formatDateTime(session.datetime)} at ${session.rate}.`, null, true);
+  renderBookingWidget(chat);
+  renderMessages(chat.id);
+  renderSessions();
+}
+
+async function handleCancelSessionFromWidget(chat, sessionId) {
+  if (!confirm("Cancel this session? The other person will see this in your chat.")) return;
+  await cancelSession(sessionId);
+  await addMessage(chat.id, `${me.name} cancelled the session proposal.`, null, true);
+  renderBookingWidget(chat);
+  renderMessages(chat.id);
+  renderSessions();
+}
+
+async function renderChatList() {
+  const chats = await getMyChats();
   const list = document.getElementById("chat-list");
 
   if (chats.length === 0) {
@@ -581,58 +915,74 @@ function renderChatList() {
       me.role === "tutee"
         ? `<p class="chat-list-empty">No chats yet. Choose a tutor from the Matching tab to start one.</p>`
         : `<p class="chat-list-empty">No chats yet. They'll show up here once a tutee chooses you.</p>`;
+    renderChatsTabBadge(0);
     return;
   }
 
-  list.innerHTML = chats
-    .map((chat) => {
+  let totalUnread = 0;
+  const rows = await Promise.all(
+    chats.map(async (chat) => {
       const partnerEmail = otherPartyEmail(chat, me.email);
-      const partnerName = formatName(partnerEmail);
-      const msgs = getMessagesForChat(chat.id);
+      const partnerName = otherPartyName(chat, me.email) || partnerEmail;
+      const msgs = await getMessagesForChat(chat.id);
       const last = msgs[msgs.length - 1];
       const preview = last ? (last.attachment ? `📎 ${last.attachment.name}` : last.text) : "No messages yet";
       const accentColor = subjectColor(chat.subject);
+      const unread = chat.id === activeChatId ? 0 : await getUnreadCountForChat(me.email, chat.id);
+      totalUnread += unread;
       return `
         <button class="chat-list-item ${chat.id === activeChatId ? "active" : ""}" data-chat-id="${chat.id}" style="--accent-color:${accentColor}">
           <span class="chat-avatar" style="background:${colorForPerson(partnerEmail)}">${initials(partnerName)}</span>
           <span class="chat-list-item-body">
-            <span class="chat-list-item-name">${partnerName}</span>
+            <span class="chat-list-item-name">${escapeHtml(partnerName)}</span>
             <span class="chat-list-item-preview"><span class="chip-dot" style="background:${accentColor}"></span>${escapeHtml(preview)}</span>
           </span>
+          ${unread ? `<span class="chat-list-item-unread">${unread}</span>` : ""}
         </button>`;
     })
-    .join("");
+  );
+  list.innerHTML = rows.join("");
 
   list.querySelectorAll(".chat-list-item").forEach((btn) => {
     btn.addEventListener("click", () => openChat(btn.dataset.chatId));
   });
+
+  renderChatsTabBadge(totalUnread);
 }
 
-function openChat(chatId) {
+function renderChatsTabBadge(totalUnread) {
+  const badge = document.getElementById("chats-tab-badge");
+  if (!badge) return;
+  badge.textContent = String(totalUnread);
+  badge.style.display = totalUnread ? "inline-block" : "none";
+}
+
+async function openChat(chatId) {
   activeChatId = chatId;
-  const chat = getChatById(chatId);
+  const chat = await getChatById(chatId);
   if (!chat) return;
 
   document.getElementById("chat-empty").style.display = "none";
   document.getElementById("chat-active").style.display = "flex";
 
-  const partnerEmail = otherPartyEmail(chat, me.email);
   const accentColor = subjectColor(chat.subject);
-  document.getElementById("chat-partner-name").textContent = formatName(partnerEmail);
+  document.getElementById("chat-partner-name").textContent = otherPartyName(chat, me.email) || otherPartyEmail(chat, me.email);
   const subjectEl = document.getElementById("chat-subject");
   subjectEl.textContent = chat.subject || "General tutoring";
   subjectEl.style.background = `${accentColor}22`;
   subjectEl.style.color = accentColor;
   document.getElementById("chat-thread-head").style.setProperty("--accent-color", accentColor);
-  document.getElementById("schedule-btn").style.display = me.role === "tutor" ? "inline-block" : "none";
+  renderBookingWidget(chat);
 
+  markChatRead(me.email, chatId);
   renderChatList();
   renderMessages(chatId);
 }
 
-function renderMessages(chatId) {
+async function renderMessages(chatId) {
   if (chatId !== activeChatId) return;
-  const messages = getMessagesForChat(chatId);
+  const messages = await getMessagesForChat(chatId);
+  if (chatId !== activeChatId) return; // could have switched chats while awaiting
   const container = document.getElementById("chat-messages");
 
   container.innerHTML = messages
@@ -660,6 +1010,9 @@ function renderMessages(chatId) {
             ${m.text ? `<p>${escapeHtml(m.text)}</p>` : ""}
             <span class="msg-time">${formatTime(m.timestamp)}</span>
           </div>
+          <button type="button" class="msg-report-btn" data-message-id="${m.id}" data-type="${m.attachment ? "file" : "message"}" aria-label="Report this message" title="Report this message">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22V3"/></svg>
+          </button>
         </div>`;
     })
     .join("");
@@ -667,27 +1020,53 @@ function renderMessages(chatId) {
   container.querySelectorAll(".msg-image").forEach((img) => {
     img.addEventListener("click", () => openLightbox(img.src));
   });
+  container.querySelectorAll(".msg-report-btn").forEach((btn) => {
+    btn.addEventListener("click", () => handleReportMessage(btn.dataset.messageId, btn.dataset.type));
+  });
 
   container.scrollTop = container.scrollHeight;
 }
 
-function handleSendMessage(e) {
+async function handleReportMessage(messageId, type) {
+  const reason = prompt("What's wrong with this message? (optional, but helps staff reviewing it)");
+  if (reason === null) return;
+  try {
+    await authFetchJson("/api/reports", {
+      method: "POST",
+      body: JSON.stringify({ chatId: activeChatId, type, targetId: messageId, reason: reason.trim() || null }),
+    });
+    alert("Reported. Mr. Machado and Ms. Way have been notified, and this conversation is available for them to review.");
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function handleSendMessage(e) {
   e.preventDefault();
   if (!activeChatId) return;
   const input = document.getElementById("message-input");
   const text = input.value.trim();
   if (!text && !pendingAttachment) return;
 
-  addMessage(activeChatId, me.email, text, pendingAttachment);
+  const chatId = activeChatId;
+  await addMessage(chatId, text, pendingAttachment);
   input.value = "";
   clearAttachment();
-  renderMessages(activeChatId);
+  renderMessages(chatId);
   renderChatList();
 }
+
+const ALLOWED_ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg"];
 
 function handleFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
+  const nameLower = file.name.toLowerCase();
+  if (!ALLOWED_ATTACHMENT_EXTENSIONS.some((ext) => nameLower.endsWith(ext))) {
+    alert("Only PDF, DOC/DOCX, PNG, and JPG files can be shared here.");
+    e.target.value = "";
+    return;
+  }
   const MAX_BYTES = 3 * 1024 * 1024;
   if (file.size > MAX_BYTES) {
     alert("That file is too big for this prototype (3MB max). Try a smaller file.");
@@ -758,12 +1137,17 @@ function candidateSubtitle(profile) {
 }
 
 // Only a tutee calls this — they're the one choosing a tutor to chat with.
-function startChatWith(tutorEmail) {
-  const myProfile = getProfile(me.email);
-  const tutorProfile = getProfile(tutorEmail);
+async function startChatWith(tutorEmail) {
+  const myProfile = await getMyProfile();
+  const { profile: tutorProfile } = await getProfileByEmail(tutorEmail);
   const shared = myProfile.subjects.find((s) => tutorProfile.subjects.includes(s));
   const subject = shared || myProfile.subjects[0] || tutorProfile.subjects[0] || "General tutoring";
-  const chat = createChat(tutorEmail, me.email, subject);
+  const existingChats = await getMyChats();
+  const isNewChat = !existingChats.some((c) => c.tutorEmail === tutorEmail);
+  const chat = await createChat(tutorEmail, subject);
+  if (isNewChat && myProfile.offer) {
+    await addMessage(chat.id, `${me.name} offered ${myProfile.offer} for tutoring — reply here to agree on a rate.`, null, true);
+  }
   window.goToTab("chats");
   openChat(chat.id);
 }
@@ -831,12 +1215,12 @@ function openCandidateProfileModal(user, profile) {
   // Feedback: tutees can leave (and see) comments about a tutor.
   renderCandidateComments(user.email);
   document.getElementById("candidate-comment-hint").textContent = "";
-  document.getElementById("candidate-comment-form").onsubmit = (e) => {
+  document.getElementById("candidate-comment-form").onsubmit = async (e) => {
     e.preventDefault();
     const input = document.getElementById("candidate-comment-input");
     const text = input.value.trim();
     if (!text) return;
-    addComment(user.email, me.email, text);
+    await addComment(user.email, text);
     input.value = "";
     document.getElementById("candidate-comment-hint").textContent = "Thanks — this is shared with the program coordinator.";
     renderCandidateComments(user.email);
@@ -845,14 +1229,14 @@ function openCandidateProfileModal(user, profile) {
   toggleModal("candidate-profile-modal", true);
 }
 
-function renderCandidateComments(tutorEmail) {
-  const comments = getVisibleCommentsForTutor(tutorEmail);
+async function renderCandidateComments(tutorEmail) {
+  const comments = await getVisibleCommentsForTutor(tutorEmail);
   document.getElementById("candidate-profile-comments-list").innerHTML = comments.length
     ? comments
         .map(
           (c) => `
       <div class="tutor-comment-row">
-        <span class="tutor-comment-author">${escapeHtml(formatName(c.authorEmail))}</span>
+        <span class="tutor-comment-author">${escapeHtml(c.authorName || c.authorEmail)}</span>
         <span class="tutor-comment-date">${formatDateTime(c.createdAt)}</span>
         <p class="tutor-comment-text">${escapeHtml(c.text)}</p>
       </div>`
@@ -861,22 +1245,21 @@ function renderCandidateComments(tutorEmail) {
     : `<p class="chat-list-empty">No feedback yet — be the first!</p>`;
 }
 
-function renderMatchingList() {
+async function renderMatchingList() {
   const listEl = document.getElementById("matching-list");
   const legendEl = document.getElementById("matching-legend-text");
   if (!listEl || me.role !== "tutee") return;
 
-  const tutors = getUsers().filter((u) => u.role === "tutor");
-  const myProfile = getProfile(me.email);
+  const [tutorPairs, myProfile, myChats] = await Promise.all([getAllTutors(), getMyProfile(), getMyChats()]);
 
   // Only tutors qualified to teach at least one class this tutee needs — the
   // tutee's "classes need help with" and the tutor's "classes can teach"
   // lists actually overlap.
-  const matched = tutors
-    .map((u) => {
-      const profile = getProfile(u.email);
-      const shared = myProfile.subjects.filter((s) => profile.subjects.includes(s));
-      return { user: u, profile, shared };
+  const matched = tutorPairs
+    .map(({ user, profile }) => {
+      const shared = myProfile.subjects.filter((s) => (profile.subjects || []).includes(s));
+      const sharedAvailability = (myProfile.availability || []).filter((a) => (profile.availability || []).includes(a));
+      return { user, profile, shared, sharedAvailability };
     })
     .filter((m) => m.shared.length > 0);
 
@@ -885,7 +1268,7 @@ function renderMatchingList() {
   const sortValue = document.getElementById("matching-sort-filter").value;
   const filtered = matched.filter((m) => {
     const deptOk = !deptValue || m.shared.some((label) => categoryForLabel(label) === deptValue);
-    const availOk = !availValue || m.profile.availability.some((a) => a.endsWith(availValue));
+    const availOk = !availValue || (m.profile.availability || []).some((a) => a.endsWith(availValue));
     return deptOk && availOk;
   });
 
@@ -908,7 +1291,7 @@ function renderMatchingList() {
     <div class="matching-stat"><span class="matching-stat-num">${departmentCount}</span><span class="matching-stat-label">Departments</span></div>
   `;
 
-  if (tutors.length === 0) {
+  if (tutorPairs.length === 0) {
     listEl.innerHTML = `<p class="chat-list-empty">No tutors have signed up yet. Check back soon.</p>`;
     return;
   }
@@ -922,7 +1305,7 @@ function renderMatchingList() {
   }
 
   listEl.innerHTML = filtered
-    .map(({ user: u, profile, shared }) => {
+    .map(({ user: u, profile, shared, sharedAvailability }) => {
       const chipsHtml = shared
         .map(
           (s) =>
@@ -932,7 +1315,7 @@ function renderMatchingList() {
         )
         .join("");
       const subtitle = candidateSubtitle(profile);
-      const existingChat = findChat(u.email, me.email);
+      const existingChat = myChats.some((c) => c.tutorEmail === u.email);
       const accentColor = subjectColor(shared[0]);
       return `
         <div class="match-row" style="--accent-color:${accentColor}">
@@ -944,6 +1327,11 @@ function renderMatchingList() {
               ${profile.rate ? `<span class="match-rate-badge">${escapeHtml(profile.rate)}</span>` : ""}
             </span>
             <span class="match-subjects">${chipsHtml}</span>
+            ${
+              sharedAvailability.length === 0
+                ? `<span class="match-no-overlap">No shared availability yet — you can still reach out to work something out</span>`
+                : ""
+            }
           </span>
           <span class="match-row-side">
             <span class="match-shared-badge">${shared.length} shared</span>
@@ -974,106 +1362,30 @@ function renderMatchingList() {
 }
 
 // ---------------- Schedule tab (tutors only) ----------------
+// Tutors no longer create sessions here — a tutee books a slot from the
+// tutor's declared availability instead (see the chat booking widget).
+// This tab is now just where a tutor reviews proposals and their confirmed
+// upcoming sessions.
 
 function initScheduleTab() {
-  populateScheduleTuteeSelect();
   renderScheduleUpcoming();
-  document.getElementById("schedule-tab-form").addEventListener("submit", handleScheduleTabSubmit);
 }
 
-function populateScheduleTuteeSelect(preselectEmail) {
-  const select = document.getElementById("schedule-tutee-select");
-  if (!select) return;
-  const priorValue = preselectEmail || select.value;
-
-  const chats = getChatsForUser(me.email);
-  const tuteeEmails = chats.map((c) => otherPartyEmail(c, me.email));
-
-  if (tuteeEmails.length === 0) {
-    select.innerHTML = `<option value="">No matched tutees yet — visit the Matching tab first</option>`;
-    select.disabled = true;
-    return;
-  }
-
-  select.disabled = false;
-  select.innerHTML = tuteeEmails
-    .map((email) => `<option value="${email}">${escapeHtml(formatName(email))}</option>`)
-    .join("");
-
-  if (priorValue && tuteeEmails.includes(priorValue)) select.value = priorValue;
-}
-
-function goToScheduleForActiveChat() {
-  const chat = getChatById(activeChatId);
-  if (!chat) return;
-  const tuteeEmail = otherPartyEmail(chat, me.email);
-  window.goToTab("schedule");
-  populateScheduleTuteeSelect(tuteeEmail);
-}
-
-function handleScheduleTabSubmit(e) {
-  e.preventDefault();
-  const tuteeEmail = document.getElementById("schedule-tutee-select").value;
-  const date = document.getElementById("schedule-tab-date").value;
-  const time = document.getElementById("schedule-tab-time").value;
-  const duration = document.getElementById("schedule-tab-duration").value;
-  const zoomLink = document.getElementById("schedule-tab-zoom").value.trim();
-  const errorEl = document.getElementById("schedule-tab-error");
-  errorEl.textContent = "";
-
-  if (!tuteeEmail) {
-    errorEl.textContent = "Pick a tutee — you need to match and start a chat with them first.";
-    return;
-  }
-  if (!date || !time) {
-    errorEl.textContent = "Pick a date and time.";
-    return;
-  }
-  const datetime = new Date(`${date}T${time}`);
-  if (Number.isNaN(datetime.getTime()) || datetime < new Date()) {
-    errorEl.textContent = "Pick a time in the future.";
-    return;
-  }
-
-  const chat = findChat(me.email, tuteeEmail);
-  if (!chat) {
-    errorEl.textContent = "Couldn't find a chat with that tutee.";
-    return;
-  }
-
-  const session = createSession({
-    chatId: chat.id,
-    tutorEmail: chat.tutorEmail,
-    tuteeEmail: chat.tuteeEmail,
-    subject: chat.subject,
-    datetime: datetime.toISOString(),
-    durationMinutes: duration,
-    zoomLink,
-  });
-
-  addMessage(chat.id, me.email, `Session scheduled for ${formatDateTime(session.datetime)} (${duration} min).`, null, true);
-
-  document.getElementById("schedule-tab-form").reset();
-  renderScheduleUpcoming();
-  renderSessions();
-  renderChatList();
-}
-
-function renderScheduleUpcoming() {
+async function renderScheduleUpcoming() {
   const list = document.getElementById("schedule-upcoming-list");
   if (!list) return;
-  const sessions = getSessionsForUser(me.email);
+  const sessions = await getMySessions();
   list.innerHTML = sessionListHtml(sessions);
-  wireSessionJoinButtons(list);
+  wireSessionButtons(list);
 }
 
 // ---------------- Sessions sidebar ----------------
 
-function renderSessions() {
-  const sessions = getSessionsForUser(me.email);
+async function renderSessions() {
+  const sessions = await getMySessions();
   const list = document.getElementById("sessions-list");
   list.innerHTML = sessionListHtml(sessions);
-  wireSessionJoinButtons(list);
+  wireSessionButtons(list);
 }
 
 function sessionListHtml(sessions) {
@@ -1084,40 +1396,156 @@ function sessionListHtml(sessions) {
   const now = Date.now();
   return sessions
     .map((s) => {
-      const partnerEmail = otherPartyEmail(s, me.email);
+      const partnerName = otherPartyName(s, me.email) || otherPartyEmail(s, me.email);
       const start = new Date(s.datetime).getTime();
       const joinOpensAt = start - 5 * 60000;
       const end = start + s.durationMinutes * 60000 + 15 * 60000;
+      const cancelled = s.status === "cancelled";
+      const proposed = s.status === "proposed";
+      const cancelledByName = s.cancelledBy === s.tutorEmail ? s.tutorName : s.tuteeName;
 
       let statusHtml;
-      if (now < joinOpensAt) {
+      if (cancelled) {
+        statusHtml = `<span class="session-countdown session-cancelled-label">Cancelled${
+          s.cancelledBy === me.email ? " by you" : cancelledByName ? ` by ${escapeHtml(cancelledByName)}` : ""
+        }</span>`;
+      } else if (proposed && me.email === s.tutorEmail) {
+        statusHtml = `<button class="btn-primary session-accept" data-session-id="${s.id}" data-chat-id="${s.chatId}" data-rate="${escapeHtml(s.rate)}" data-datetime="${s.datetime}">Accept Proposal</button>`;
+      } else if (proposed) {
+        statusHtml = `<span class="session-countdown">Waiting for ${escapeHtml(s.tutorName || s.tutorEmail)} to accept</span>`;
+      } else if (now < joinOpensAt) {
         statusHtml = `<span class="session-countdown">${countdownText(start - now)}</span>`;
       } else if (now <= end) {
         statusHtml = `<button class="btn-primary session-join" data-session-id="${s.id}">Join Video Call</button>`;
-        if (s.zoomLink) {
-          statusHtml += `<a class="btn-ghost session-zoom" href="${escapeHtml(s.zoomLink)}" target="_blank" rel="noopener noreferrer">Open Zoom Instead</a>`;
-        }
       } else {
         statusHtml = `<span class="session-countdown session-past">Completed</span>`;
       }
 
+      let zoomHtml = "";
+      if (!cancelled && !proposed) {
+        if (s.zoomLink) {
+          zoomHtml = `
+            <div class="session-zoom-row">
+              <a class="btn-ghost session-zoom" href="${escapeHtml(s.zoomLink)}" target="_blank" rel="noopener noreferrer">Open Zoom Link</a>
+              <button type="button" class="link-btn session-zoom-copy" data-zoom-link="${escapeHtml(s.zoomLink)}">Copy</button>
+              ${
+                me.email === s.tutorEmail
+                  ? `<button type="button" class="link-btn session-zoom-edit" data-session-id="${s.id}" data-chat-id="${s.chatId}" data-zoom-link="${escapeHtml(s.zoomLink)}">Edit</button>`
+                  : ""
+              }
+            </div>`;
+        } else if (me.email === s.tutorEmail) {
+          zoomHtml = `<button type="button" class="link-btn session-zoom-edit" data-session-id="${s.id}" data-chat-id="${s.chatId}" data-zoom-link="">+ Add Zoom Link</button>`;
+        }
+      }
+
+      const cancelHtml =
+        !cancelled && now < end
+          ? `<button type="button" class="link-btn session-cancel" data-session-id="${s.id}" data-chat-id="${s.chatId}" data-datetime="${s.datetime}">${proposed ? "Decline" : "Cancel Session"}</button>`
+          : "";
+
       return `
-        <div class="session-card" style="--accent-color:${subjectColor(s.subject)}">
-          <span class="session-partner">${formatName(partnerEmail)}</span>
-          <span class="session-subject">${escapeHtml(s.subject || "General tutoring")}</span>
+        <div class="session-card ${cancelled ? "session-card-cancelled" : ""}" style="--accent-color:${subjectColor(s.subject)}">
+          <span class="session-partner">${escapeHtml(partnerName)}</span>
+          <span class="session-subject">${escapeHtml(s.subject || "General tutoring")}${s.rate ? ` · ${escapeHtml(s.rate)}` : ""}</span>
           <span class="session-time">${formatDateTime(s.datetime)} · ${s.durationMinutes} min</span>
           ${statusHtml}
+          ${zoomHtml}
+          ${cancelHtml}
         </div>`;
     })
     .join("");
 }
 
-function wireSessionJoinButtons(container) {
+function wireSessionButtons(container) {
   container.querySelectorAll(".session-join").forEach((btn) => {
     btn.addEventListener("click", () => {
       window.location.href = `/video?session=${btn.dataset.sessionId}`;
     });
   });
+  container.querySelectorAll(".session-cancel").forEach((btn) => {
+    btn.addEventListener("click", () => handleCancelSession(btn.dataset.sessionId, btn.dataset.chatId, btn.dataset.datetime));
+  });
+  container.querySelectorAll(".session-accept").forEach((btn) => {
+    btn.addEventListener("click", () => handleAcceptSessionFromList(btn.dataset.sessionId, btn.dataset.chatId, btn.dataset.datetime, btn.dataset.rate));
+  });
+  container.querySelectorAll(".session-zoom-copy").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const flash = (label) => {
+        const original = btn.textContent;
+        btn.textContent = label;
+        setTimeout(() => {
+          btn.textContent = original;
+        }, 1500);
+      };
+      if (!navigator.clipboard) {
+        flash("Copy failed");
+        return;
+      }
+      navigator.clipboard
+        .writeText(btn.dataset.zoomLink)
+        .then(() => flash("Copied!"))
+        .catch(() => flash("Copy failed"));
+    });
+  });
+  container.querySelectorAll(".session-zoom-edit").forEach((btn) => {
+    btn.addEventListener("click", () => handleEditZoomLink(btn.dataset.sessionId, btn.dataset.chatId, btn.dataset.zoomLink));
+  });
+}
+
+// Cancellation is a status flip (not a delete) so both people keep a record.
+// The other party is "notified" the same way every other session update is
+// communicated here — a system message dropped into their shared chat.
+async function handleCancelSession(sessionId, chatId, datetime) {
+  if (!confirm("Cancel this session? The other person will see this in your chat.")) return;
+
+  await cancelSession(sessionId);
+  if (chatId) {
+    await addMessage(chatId, `${me.name} cancelled the session scheduled for ${formatDateTime(datetime)}.`, null, true);
+  }
+
+  renderSessions();
+  renderScheduleUpcoming();
+  renderChatList();
+  if (activeChatId === chatId) renderMessages(chatId);
+}
+
+async function handleAcceptSessionFromList(sessionId, chatId, datetime, rate) {
+  await acceptSession(sessionId);
+  if (chatId) {
+    await addMessage(chatId, `${me.name} accepted the session for ${formatDateTime(datetime)} at ${rate}.`, null, true);
+  }
+  renderSessions();
+  renderScheduleUpcoming();
+  renderChatList();
+  if (activeChatId === chatId) renderMessages(chatId);
+}
+
+// Zoom link editing after scheduling — not just at creation time — plus a
+// basic URL sanity check. Posts a system message so a link change counts as
+// an "essential session update" the other party sees, same as cancellation.
+async function handleEditZoomLink(sessionId, chatId, currentLink) {
+  const value = prompt("Zoom link for this session:", currentLink || "");
+  if (value === null) return;
+  const trimmed = value.trim();
+  if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+    alert("That doesn't look like a valid link — it should start with http:// or https://");
+    return;
+  }
+
+  try {
+    await updateSessionZoomLink(sessionId, trimmed);
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
+  if (chatId) {
+    await addMessage(chatId, trimmed ? `Zoom link updated: ${trimmed}` : "Zoom link removed.", null, true);
+  }
+
+  renderSessions();
+  renderScheduleUpcoming();
+  if (activeChatId === chatId) renderMessages(chatId);
 }
 
 function countdownText(ms) {

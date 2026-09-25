@@ -1,9 +1,11 @@
+import SiteFooter from "./SiteFooter";
+
 export default function LandingPage() {
   return (
     <>
       <nav className="site-nav">
         <div className="brand-logo">
-          <img src="/assets/vcs-lockup-color.png" alt="Valley Christian Schools" />
+          <img src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" />
           <span className="program-tag">
             Peer
             <br />
@@ -22,9 +24,11 @@ export default function LandingPage() {
       </nav>
 
       <header className="hero">
-        <img className="hero-logo" src="/assets/vcs-lockup-white.png" alt="Valley Christian Schools" />
+        <span className="hero-logo-chip">
+          <img className="hero-logo" src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" />
+        </span>
         <p className="eyebrow">Peer Tutoring</p>
-        <h1>Every Warrior has something to teach&mdash;and something to learn.</h1>
+        <h1>Every Warrior has something to teach<br />and something to learn.</h1>
         <p className="hero-sub">
           Sign up as a tutor or tutee, get matched, and take it from there: chat, video call, and share files, all in one place.
         </p>
@@ -109,43 +113,34 @@ export default function LandingPage() {
       <section className="section" id="audience">
         <div className="section-head">
           <p className="eyebrow">Get Started</p>
-          <h2>Which Warrior are you?</h2>
-          <p>You can always add the other role to your account later.</p>
+          <h2>Ready to connect with your next Warrior?</h2>
+          <p>It takes less than a minute to create your account.</p>
         </div>
         <div className="audience-grid">
-          <div className="audience-card tutor">
-            <span className="role-title">For Tutors</span>
-            <h3>Share what you know</h3>
-            <ul>
-              <li>Set the subjects you&apos;re strong in</li>
-              <li>Get matched with tutees who need your help</li>
-              <li>Build service hours while making an impact</li>
-            </ul>
-            <a className="btn-primary btn-link" href="/login?tab=signup">Sign Up to Tutor</a>
-          </div>
-          <div className="audience-card tutee">
+          <div className="audience-card dark">
             <span className="role-title">For Tutees</span>
             <h3>Get the help you need</h3>
             <ul>
               <li>Tell us what you&apos;re struggling with</li>
-              <li>Get matched with a tutor in that subject</li>
+              <li>Choose a tutor in that subject yourself</li>
               <li>Chat, meet, and share files until it clicks</li>
             </ul>
-            <a className="btn-primary btn-link" href="/login?tab=signup">Sign Up for Tutoring</a>
+            <a className="btn-primary btn-link" href="/login?tab=signup&role=tutee">Sign Up for Tutoring</a>
+          </div>
+          <div className="audience-card light">
+            <span className="role-title">For Tutors</span>
+            <h3>Share what you know</h3>
+            <ul>
+              <li>Set the subjects you&apos;re strong in</li>
+              <li>Get chosen by tutees who need your help</li>
+              <li>Build service hours while making an impact</li>
+            </ul>
+            <a className="btn-primary btn-link" href="/login?tab=signup&role=tutor">Sign Up to Tutor</a>
           </div>
         </div>
       </section>
 
-      <section className="cta-section">
-        <h2>Ready to connect with your next Warrior?</h2>
-        <p>It takes less than a minute to create your account.</p>
-        <a className="btn-primary btn-link" href="/login?tab=signup">Get Started for Free</a>
-      </section>
-
-      <footer className="site-footer">
-        <img className="footer-logo" src="/assets/vcs-lockup-color-tagline.png" alt="Valley Christian Schools — Quest for Excellence" />
-        <p className="footer-meta">Peer Tutoring &middot; Local prototype, not an official VCS system</p>
-      </footer>
+      <SiteFooter />
     </>
   );
 }

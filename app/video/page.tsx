@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { BUILD_VERSION } from "../../lib/buildVersion";
+import CallSignalBridge from "./CallSignalBridge";
 
 export const metadata: Metadata = {
   title: "Video Session | Peer Tutoring",
@@ -8,6 +10,7 @@ export const metadata: Metadata = {
 export default function VideoPage() {
   return (
     <div className="call-body">
+      <CallSignalBridge />
       <div id="call-error" className="call-error" style={{ display: "none" }}>
         <div className="call-error-card">
           <h2>Can&apos;t open this session</h2>
@@ -25,14 +28,19 @@ export default function VideoPage() {
             <span className="call-partner" id="call-partner-name"></span>
             <span className="call-subject" id="call-subject"></span>
           </div>
-          <span className="call-status" id="call-status">Setting up…</span>
+          <div className="call-header-right">
+            <span className="call-status" id="call-status">Setting up…</span>
+            <button type="button" className="call-report-btn" id="call-report-btn">Report This Session</button>
+          </div>
         </header>
+        <p className="safety-banner">
+          School rules apply here &middot; Report reaches Mr. Machado and Ms. Way &middot; Reported sessions can be reviewed
+        </p>
 
         <main className="call-stage">
           <video id="remote-video" className="video-slot video-slot-main" autoPlay playsInline></video>
           <div className="waiting-overlay" id="waiting-overlay">
             <p id="waiting-text">Waiting for the other person to join…</p>
-            <p className="waiting-hint">Demo tip: open this session in a second tab (or ask them to open their own tab) to test the call on this device.</p>
             <div className="zoom-fallback" id="zoom-fallback" style={{ display: "none" }}>
               <p className="zoom-fallback-text">Trouble connecting?</p>
               <a className="btn-primary btn-link" id="zoom-fallback-link" href="#" target="_blank" rel="noopener noreferrer">
@@ -67,7 +75,7 @@ export default function VideoPage() {
         </footer>
       </div>
 
-      <Script src="/video.js" strategy="afterInteractive" />
+      <Script src={`/video.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>
   );
 }

@@ -34,9 +34,20 @@ document.querySelectorAll(".toggle-visibility").forEach((btn) => {
   });
 });
 
-document.getElementById("forgot-password").addEventListener("click", () => {
+document.getElementById("forgot-password").addEventListener("click", async () => {
+  const email = prompt("Enter your school email to receive a password reset link:");
+  if (!email) return;
   clearAlerts();
-  showSuccess("This is a local prototype, so password resets aren't wired up yet. Try creating a new account instead.");
+  try {
+    await fetch("/api/auth/request-password-reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+  } catch {
+    // fall through to the same message either way — never reveal whether the email exists
+  }
+  showSuccess("If that email has an account, a reset link is on its way. Check your inbox.");
 });
 
 // ---------------- Signup: photo + intro video uploads ----------------
@@ -169,23 +180,31 @@ formLogin.addEventListener("submit", async (e) => {
     setFieldError("field-login-password", "Enter your password.");
     valid = false;
   }
-  if (!valid) return;
+  if (!valid) {
+    scrollToFirstError(formLogin);
+    return;
+  }
 
   const submitBtn = document.getElementById("login-submit");
   submitBtn.disabled = true;
 
-  const users = getUsers();
-  const user = users.find((u) => u.email === email);
-  const passwordHash = await hashPassword(password);
-
-  if (!user || user.passwordHash !== passwordHash) {
-    showError("That email and password don't match an account here.");
+  let data;
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || "That email and password don't match an account here.");
+  } catch (err) {
+    showError(err.message);
     submitBtn.disabled = false;
     return;
   }
 
-  startSession(user);
-  showSuccess(`Welcome back, ${user.name.split(" ")[0]}! Taking you to your dashboard…`);
+  startSession(data.token, data.user);
+  showSuccess(`Welcome back, ${data.user.name.split(" ")[0]}! Taking you to your dashboard…`);
   setTimeout(() => {
     window.location.href = "/app";
   }, 700);
@@ -224,41 +243,42 @@ formSignup.addEventListener("submit", async (e) => {
     showError("Please agree to be matched and contacted through Peer Tutoring.");
     valid = false;
   }
-  if (!valid) return;
+  if (!valid) {
+    scrollToFirstError(formSignup);
+    return;
+  }
 
   const submitBtn = document.getElementById("signup-submit");
   submitBtn.disabled = true;
 
-  const users = getUsers();
-  if (users.some((u) => u.email === email)) {
-    setFieldError("field-signup-email", "An account with this email already exists.");
+  let data;
+  try {
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, role }),
+    });
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Could not create your account.");
+  } catch (err) {
+    setFieldError("field-signup-email", err.message);
+    scrollToFirstError(formSignup);
     submitBtn.disabled = false;
     return;
   }
 
-  const passwordHash = await hashPassword(password);
-  const newUser = {
-    id: crypto.randomUUID(),
-    name,
-    email,
-    passwordHash,
-    role,
-    createdAt: new Date().toISOString(),
-  };
-  users.push(newUser);
-  saveUsers(users);
-  startSession(newUser);
+  startSession(data.token, data.user);
 
   if (signupPendingPhoto || signupPendingVideo) {
-    const profile = getProfile(email);
+    const profile = await getMyProfile();
     profile.photo = signupPendingPhoto;
     if (role === "tutor") profile.introVideo = signupPendingVideo;
-    saveProfile(email, profile);
+    await saveMyProfile(profile);
   }
 
   showSuccess(`Account created! Welcome to Peer Tutoring, ${name.split(" ")[0]}.`);
   setTimeout(() => {
-    window.location.href = "/app";
+    window.location.href = "/sign-agreement";
   }, 700);
 });
 
@@ -272,5 +292,15 @@ formSignup.addEventListener("submit", async (e) => {
   const params = new URLSearchParams(window.location.search);
   if (params.get("tab") === "signup") {
     showTab("signup");
+  }
+  // The homepage's "Sign Up to Tutor" / "Sign Up for Tutoring" buttons both
+  // used to land on this same generic form, which defaults to the Tutor
+  // radio regardless of which button was clicked — an easy way to end up
+  // with the wrong role. A ?role= param lets each button pre-select the
+  // right one.
+  const requestedRole = params.get("role");
+  if (requestedRole === "tutor" || requestedRole === "tutee") {
+    const radio = document.getElementById(`role-${requestedRole}`);
+    if (radio) radio.checked = true;
   }
 })();

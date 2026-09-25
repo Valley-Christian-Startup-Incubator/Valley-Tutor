@@ -7,7 +7,7 @@ if (me) {
 async function init() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session");
-  const session = sessionId ? getSessionById(sessionId) : null;
+  const session = sessionId ? await getSessionById(sessionId).catch(() => null) : null;
 
   if (!session || (session.tutorEmail !== me.email && session.tuteeEmail !== me.email)) {
     showError("This session doesn't exist, or you're not part of it.");
@@ -15,9 +15,24 @@ async function init() {
   }
 
   const partnerEmail = otherPartyEmail(session, me.email);
-  document.getElementById("call-partner-name").textContent = formatName(partnerEmail);
+  const partnerName = otherPartyName(session, me.email) || partnerEmail;
+  document.getElementById("call-partner-name").textContent = partnerName;
   document.getElementById("call-subject").textContent = session.subject || "General tutoring";
   document.getElementById("call-shell").style.display = "flex";
+
+  document.getElementById("call-report-btn").addEventListener("click", async () => {
+    const reason = prompt("What's wrong with this session? (optional, but helps staff reviewing it)");
+    if (reason === null) return;
+    try {
+      await authFetchJson("/api/reports", {
+        method: "POST",
+        body: JSON.stringify({ chatId: session.chatId, type: "video_session", targetId: session.id, reason: reason.trim() || null }),
+      });
+      alert("Reported. Mr. Machado and Ms. Way have been notified, and this session is available for them to review.");
+    } catch (err) {
+      alert(err.message);
+    }
+  });
 
   const statusEl = document.getElementById("call-status");
   const waitingOverlay = document.getElementById("waiting-overlay");
@@ -50,7 +65,14 @@ async function init() {
   localVideo.srcObject = localStream;
 
   const isCaller = me.email === session.tutorEmail;
-  const callChannel = new BroadcastChannel(`wc_call_${sessionId}`);
+
+  // Signals over Supabase Realtime (see CallSignalBridge.tsx) instead of a
+  // plain BroadcastChannel, which only relays between tabs of the same
+  // browser — useless for a tutor and tutee on two separate real devices.
+  if (!window.createCallSignalChannel) {
+    await new Promise((resolve) => window.addEventListener("call-signal-ready", resolve, { once: true }));
+  }
+  const callChannel = window.createCallSignalChannel(sessionId);
 
   const pc = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -127,7 +149,7 @@ async function init() {
     } else if (data.type === "leave") {
       statusEl.textContent = "They left";
       waitingOverlay.style.display = "flex";
-      document.getElementById("waiting-text").textContent = `${formatName(partnerEmail)} left the call.`;
+      document.getElementById("waiting-text").textContent = `${partnerName} left the call.`;
       remoteVideo.srcObject = null;
     }
   };

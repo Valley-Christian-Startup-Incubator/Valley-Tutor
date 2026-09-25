@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { BUILD_VERSION } from "../../lib/buildVersion";
+import SiteFooter from "../SiteFooter";
 
 export const metadata: Metadata = {
   title: "Log In | Valley Christian Schools Peer Tutoring",
@@ -12,7 +14,9 @@ export default function LoginPage() {
       <section className="brand-panel">
         <div>
           <div className="brand-logo on-dark large">
-            <img src="/assets/vcs-lockup-white.png" alt="Valley Christian Schools" />
+            <span className="logo-chip">
+              <img src="/assets/vcs-bei-logo.png" alt="VCS BEI — Business, Entrepreneurship & Innovation" />
+            </span>
             <span className="program-tag">
               Peer
               <br />
@@ -57,7 +61,7 @@ export default function LoginPage() {
 
             <div className="field" id="field-login-email">
               <label htmlFor="login-email">Email</label>
-              <input type="email" id="login-email" autoComplete="email" placeholder="you@vcs.net" />
+              <input type="email" id="login-email" autoComplete="email" placeholder="you@warriorlife.net" />
               <div className="field-error"></div>
             </div>
 
@@ -146,7 +150,7 @@ export default function LoginPage() {
 
             <div className="field" id="field-signup-email">
               <label htmlFor="signup-email">School email</label>
-              <input type="email" id="signup-email" autoComplete="email" placeholder="you@vcs.net" />
+              <input type="email" id="signup-email" autoComplete="email" placeholder="you@warriorlife.net" />
               <div className="field-hint">Use your Valley Christian school email.</div>
               <div className="field-error"></div>
             </div>
@@ -198,7 +202,9 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <Script src="/auth.js" strategy="afterInteractive" />
+      <SiteFooter />
+
+      <Script src={`/auth.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>
   );
 }
