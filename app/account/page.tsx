@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { BUILD_VERSION } from "../../lib/buildVersion";
+import SiteFooter from "../SiteFooter";
 
 export const metadata: Metadata = {
   title: "Account | Valley Christian Schools Peer Tutoring",
@@ -75,6 +76,8 @@ export default function AccountPage() {
           </div>
         </section>
       </main>
+
+      <SiteFooter />
 
       <Script src={`/account.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>

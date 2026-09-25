@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { BUILD_VERSION } from "../../lib/buildVersion";
+import SiteFooter from "../SiteFooter";
 
 export const metadata: Metadata = {
   title: "Reset Password | Valley Christian Schools Peer Tutoring",
@@ -56,6 +57,8 @@ export default function ResetPasswordPage() {
           </form>
         </div>
       </section>
+
+      <SiteFooter />
 
       <Script src={`/reset-password.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>

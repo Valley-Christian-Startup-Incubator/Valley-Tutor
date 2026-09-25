@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { BUILD_VERSION } from "../../lib/buildVersion";
+import SiteFooter from "../SiteFooter";
 
 export const metadata: Metadata = {
   title: "Sign Your Agreement | Peer Tutoring",
@@ -65,6 +66,8 @@ export default function SignAgreementPage() {
           </p>
         </div>
       </section>
+
+      <SiteFooter />
 
       <Script src={`/sign.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>

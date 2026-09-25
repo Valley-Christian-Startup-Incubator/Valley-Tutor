@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { BUILD_VERSION } from "../../lib/buildVersion";
+import SiteFooter from "../SiteFooter";
 
 export const metadata: Metadata = {
   title: "Admin | Peer Tutoring",
@@ -38,6 +39,8 @@ export default function AdminPage() {
           <div id="admin-users-list"></div>
         </section>
       </main>
+
+      <SiteFooter />
 
       <Script src={`/admin.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>

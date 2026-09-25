@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { BUILD_VERSION } from "../../lib/buildVersion";
+import SiteFooter from "../SiteFooter";
 
 export const metadata: Metadata = {
   title: "Log In | Valley Christian Schools Peer Tutoring",
@@ -200,6 +201,8 @@ export default function LoginPage() {
           <p className="footer-note">This is a local prototype &mdash; accounts are stored on this device only.</p>
         </div>
       </section>
+
+      <SiteFooter />
 
       <Script src={`/auth.js?v=${BUILD_VERSION}`} strategy="afterInteractive" />
     </div>

@@ -1,5 +1,6 @@
 import Script from "next/script";
 import { BUILD_VERSION } from "../../lib/buildVersion";
+import SiteFooter from "../SiteFooter";
 
 export default function AppPage() {
   return (
@@ -323,6 +324,8 @@ export default function AppPage() {
           </div>
         </section>
       </main>
+
+      <SiteFooter />
 
       {/* Image lightbox: clicking a shared photo in chat opens it here instead of downloading it. */}
       <div className="modal-overlay lightbox-overlay" id="image-lightbox">
