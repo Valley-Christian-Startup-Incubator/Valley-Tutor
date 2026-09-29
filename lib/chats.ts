@@ -24,6 +24,10 @@ export function chatRowToJson(row: Record<string, unknown>, names?: Map<string, 
     tutorName: names?.get(row.tutor_email as string) ?? null,
     tuteeName: names?.get(row.tutee_email as string) ?? null,
     subject: row.subject,
+    loggedSessions: row.logged_sessions ?? 0,
+    loggedHours: row.logged_hours ?? 0,
+    loggedUpdatedBy: row.logged_updated_by ?? null,
+    loggedUpdatedAt: row.logged_updated_at ?? null,
     createdAt: row.created_at,
   };
 }

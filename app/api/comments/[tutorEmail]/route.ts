@@ -10,6 +10,7 @@ function commentRowToJson(row: Record<string, unknown>, names?: Map<string, stri
     authorEmail: row.author_email,
     authorName: names?.get(row.author_email as string) ?? null,
     text: row.text,
+    rating: row.rating,
     sentiment: row.sentiment,
     createdAt: row.created_at,
   };

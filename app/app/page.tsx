@@ -132,6 +132,7 @@ export default function AppPage() {
                   <div className="profile-card" id="tutor-comments-card" style={{ display: "none" }}>
                     <h2>What Tutees Are Saying</h2>
                     <p className="profile-lead">Public feedback from tutees you&apos;ve worked with.</p>
+                    <div id="tutor-rating-summary" className="tutor-rating-summary"></div>
                     <div id="tutor-comments-list"></div>
                   </div>
                 </div>
@@ -285,6 +286,8 @@ export default function AppPage() {
                     <h2 id="chat-partner-name"></h2>
                     <span className="chat-subject" id="chat-subject"></span>
                     <div className="chat-rate-widget" id="chat-rate-widget"></div>
+                    <div className="chat-rate-widget" id="chat-log-widget"></div>
+                    <div className="chat-rate-widget" id="chat-review-widget"></div>
                   </div>
                 </div>
                 <div className="chat-messages" id="chat-messages"></div>
@@ -363,15 +366,10 @@ export default function AppPage() {
 
             <button type="button" className="btn-primary" id="candidate-profile-chat-btn" style={{ maxWidth: "none" }}>Start Chat</button>
 
-            <div className="candidate-profile-section" id="candidate-profile-comments-section">
-              <h4>Feedback</h4>
-              <div id="candidate-profile-comments-list"></div>
-              <form id="candidate-comment-form">
-                <textarea id="candidate-comment-input" rows={3} maxLength={500} placeholder="Share feedback about this tutor…"></textarea>
-                <button type="submit" className="btn-ghost candidate-comment-submit">Post Feedback</button>
-                <p className="field-hint" id="candidate-comment-hint"></p>
-              </form>
-            </div>
+            <details className="candidate-profile-section reviews-dropdown" id="candidate-profile-reviews-section">
+              <summary id="candidate-profile-reviews-summary">Reviews</summary>
+              <div className="reviews-dropdown-body" id="candidate-profile-comments-list"></div>
+            </details>
           </div>
         </div>
       </div>

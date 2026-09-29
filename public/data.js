@@ -477,18 +477,36 @@ async function acceptSession(sessionId) {
   return session;
 }
 
-// ---------- Comments (tutee feedback on tutors) ----------
+// ---------- Session/hour logging + ratings (per chat) ----------
+// Either side can log that they did a session together (bumps a running
+// count + hours total on the chat); once at least one is logged, the tutee
+// can rate/review the tutor from that chat.
+
+async function logChatSession(chatId, hours) {
+  const chat = await authFetchJson(`/api/chats/${chatId}/log`, {
+    method: "POST",
+    body: JSON.stringify({ hours }),
+  });
+  notifyUpdate("chat");
+  return chat;
+}
+
+async function getTutorStats(tutorEmail) {
+  return authFetchJson(`/api/tutors/${encodeURIComponent(tutorEmail)}/stats`);
+}
+
+// ---------- Comments/reviews (tutee feedback + star rating on tutors) ----------
 // Not real moderation — there's no human reviewer here, just a keyword
 // heuristic standing in for one (see lib/comments.ts, now server-side).
-// "Warm" comments show up on the tutor's profile immediately; "cold" ones
-// are held back (never shown to anyone in this prototype).
+// "Warm" ones show up on the tutor's profile immediately; "cold" ones are
+// held back (never shown to anyone in this prototype).
 
 async function getVisibleCommentsForTutor(tutorEmail) {
   return authFetchJson(`/api/comments/${encodeURIComponent(tutorEmail)}`);
 }
 
-async function addComment(tutorEmail, text) {
-  await authFetchJson("/api/comments", { method: "POST", body: JSON.stringify({ tutorEmail, text }) });
+async function addComment(tutorEmail, text, rating) {
+  await authFetchJson("/api/comments", { method: "POST", body: JSON.stringify({ tutorEmail, text, rating }) });
   notifyUpdate("comment");
 }
 

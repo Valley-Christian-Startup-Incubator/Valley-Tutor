@@ -1525,6 +1525,174 @@
   font-size: 12.5px;
 }
 
+/* Star rating: a row of 5 stars, each two-thirds background/outline (empty)
+   and a color overlay clipped to a --fill percentage (0/50/100) for 0.5-step
+   ratings. .star-rating-input adds click targets over each half-star. */
+.star-rating {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.star-rating .star {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.star-rating .star svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.star-rating .star-bg {
+  color: #dfe3e6;
+}
+
+.star-rating .star-fill-wrap {
+  position: absolute;
+  inset: 0;
+  width: var(--fill, 0%);
+  overflow: hidden;
+}
+
+.star-rating .star-fill-wrap svg {
+  color: #f4a900;
+}
+
+.star-rating-input .star {
+  cursor: pointer;
+}
+
+.star-hit-half {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+}
+
+.star-hit-left {
+  left: 0;
+}
+
+.star-hit-right {
+  right: 0;
+}
+
+.star-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.star-rating-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy-dark);
+}
+
+.chat-log-widget,
+.chat-review-widget {
+  align-items: flex-start;
+}
+
+.chat-review-widget textarea {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1.5px solid #dfe3e6;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 360px;
+  resize: vertical;
+}
+
+.chat-review-widget textarea:focus {
+  outline: none;
+  border-color: var(--sky);
+  box-shadow: 0 0 0 3px rgba(140, 210, 244, 0.35);
+}
+
+.chat-review-form,
+.chat-log-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.chat-log-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-log-form-row input {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1.5px solid #dfe3e6;
+  border-radius: 8px;
+  width: 90px;
+}
+
+.tutor-rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #7b858d;
+}
+
+.tutor-rating-summary strong {
+  color: var(--navy-dark);
+}
+
+.tutor-comment-row .star-rating {
+  margin-bottom: 4px;
+}
+
+.reviews-dropdown summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--navy-dark);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviews-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.reviews-dropdown summary::after {
+  content: "▾";
+  color: var(--gray);
+  font-size: 11px;
+  margin-left: 2px;
+}
+
+.reviews-dropdown[open] summary::after {
+  content: "▴";
+}
+
+.reviews-dropdown summary .reviews-count {
+  font-weight: 400;
+  color: #7b858d;
+  font-size: 12.5px;
+}
+
+.reviews-dropdown-body {
+  margin-top: 10px;
+}
+
 .chat-booking-form {
   flex-direction: column;
   align-items: stretch;

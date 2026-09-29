@@ -372,17 +372,28 @@ async function initProfileTab() {
     </label>`
   ).join("");
 
-  // Comments a tutor has received (warm ones only — cold feedback is held
-  // back, see lib/comments.ts). Tutees don't have a comments card.
+  // Comments/reviews a tutor has received (warm ones only — cold feedback
+  // is held back, see lib/comments.ts), plus their logged-session totals
+  // and average rating (app/api/tutors/[email]/stats). Tutees don't have a
+  // comments card.
   const commentsCard = document.getElementById("tutor-comments-card");
   if (isTutor) {
     commentsCard.style.display = "block";
-    const comments = await getVisibleCommentsForTutor(me.email);
+    const [comments, stats] = await Promise.all([getVisibleCommentsForTutor(me.email), getTutorStats(me.email)]);
+    document.getElementById("tutor-rating-summary").innerHTML = `
+      ${
+        stats.ratingCount
+          ? `${starRatingHtml(stats.averageRating)} <strong>${stats.averageRating}</strong> (${stats.ratingCount} rating${stats.ratingCount === 1 ? "" : "s"})`
+          : "No ratings yet"
+      }
+      <span>&middot; <strong>${stats.sessions}</strong> session${stats.sessions === 1 ? "" : "s"} tutored</span>
+      <span>&middot; <strong>${stats.hours}</strong> hr${stats.hours === 1 ? "" : "s"} tutored</span>`;
     document.getElementById("tutor-comments-list").innerHTML = comments.length
       ? comments
           .map(
             (c) => `
         <div class="tutor-comment-row">
+          ${c.rating != null ? starRatingHtml(c.rating) : ""}
           <span class="tutor-comment-author">${escapeHtml(c.authorName || c.authorEmail)}</span>
           <span class="tutor-comment-date">${formatDateTime(c.createdAt)}</span>
           <p class="tutor-comment-text">${escapeHtml(c.text)}</p>
@@ -906,6 +917,119 @@ async function handleCancelSessionFromWidget(chat, sessionId) {
   renderSessions();
 }
 
+// ---------------- Session/hour log + rating widgets (in-chat) ----------------
+// Either side can log a session (bumps a shared running count/hours total
+// on the chat); once at least one is logged, the tutee can rate + review
+// the tutor from the same chat. See app/api/chats/[chatId]/log and
+// app/api/comments for the server-side rules this mirrors.
+
+async function renderChatLogWidget(chat) {
+  const widget = document.getElementById("chat-log-widget");
+  if (!widget) return;
+  const summary = `<span>${chat.loggedSessions} session${chat.loggedSessions === 1 ? "" : "s"} · ${chat.loggedHours} hr${
+    chat.loggedHours === 1 ? "" : "s"
+  } logged together</span>`;
+  widget.innerHTML = `${summary}<button type="button" class="link-btn chat-log-btn">+ Log a Session</button>`;
+  widget.querySelector(".chat-log-btn").addEventListener("click", () => showLogSessionForm(chat));
+}
+
+function showLogSessionForm(chat) {
+  const widget = document.getElementById("chat-log-widget");
+  widget.innerHTML = `
+    <form class="chat-rate-form chat-log-form" id="chat-log-form">
+      <div class="chat-log-form-row">
+        <label for="log-hours-input" class="field-hint">Hours for this session</label>
+        <input type="number" id="log-hours-input" min="0" max="24" step="0.25" value="1" required />
+      </div>
+      <div class="chat-log-form-row">
+        <button type="submit" class="btn-primary">Log Session</button>
+        <button type="button" class="link-btn" id="log-cancel-btn">Cancel</button>
+      </div>
+      <div class="field-error" id="log-error"></div>
+    </form>`;
+
+  document.getElementById("log-cancel-btn").addEventListener("click", () => renderChatLogWidget(chat));
+  document.getElementById("chat-log-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("log-error");
+    const hours = parseFloat(document.getElementById("log-hours-input").value);
+    if (Number.isNaN(hours) || hours < 0) {
+      errorEl.textContent = "Enter a valid number of hours.";
+      return;
+    }
+    try {
+      const updated = await logChatSession(chat.id, hours);
+      renderChatLogWidget(updated);
+      renderChatReviewWidget(updated);
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+}
+
+async function renderChatReviewWidget(chat) {
+  const widget = document.getElementById("chat-review-widget");
+  if (!widget) return;
+
+  if (me.email !== chat.tuteeEmail) {
+    widget.innerHTML = "";
+    return;
+  }
+  if (chat.loggedSessions < 1) {
+    widget.innerHTML = `<span class="field-hint">Log a session above to rate & review ${escapeHtml(chat.tutorName || "your tutor")}.</span>`;
+    return;
+  }
+
+  const comments = await getVisibleCommentsForTutor(chat.tutorEmail);
+  const mine = comments.find((c) => c.authorEmail === me.email);
+  showReviewForm(chat, mine);
+}
+
+function showReviewForm(chat, existing) {
+  const widget = document.getElementById("chat-review-widget");
+  let pendingValue = existing ? existing.rating : 0;
+
+  widget.innerHTML = `
+    <form class="chat-rate-form chat-review-form" id="chat-review-form">
+      <div class="star-rating-row">
+        ${starRatingPickerHtml(pendingValue)}
+        <span class="star-rating-value" id="review-rating-value">${pendingValue ? `${pendingValue.toFixed(1)} / 5` : "Tap to rate"}</span>
+      </div>
+      <textarea id="review-text-input" rows="2" maxLength="500" placeholder="Share feedback about this tutor…">${escapeHtml(
+        existing ? existing.text : ""
+      )}</textarea>
+      <button type="submit" class="btn-ghost">${existing ? "Update Review" : "Post Review"}</button>
+      <p class="field-hint" id="review-hint"></p>
+    </form>`;
+
+  wireStarRatingPicker(document.querySelector("#chat-review-form .star-rating-input"), (value) => {
+    pendingValue = value;
+    document.getElementById("review-rating-value").textContent = `${value.toFixed(1)} / 5`;
+  });
+
+  document.getElementById("chat-review-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const hint = document.getElementById("review-hint");
+    const text = document.getElementById("review-text-input").value.trim();
+    if (!pendingValue) {
+      hint.textContent = "Tap a star to rate before posting.";
+      return;
+    }
+    if (!text) {
+      hint.textContent = "Add a short note along with your rating.";
+      return;
+    }
+    try {
+      await addComment(chat.tutorEmail, text, pendingValue);
+    } catch (err) {
+      hint.textContent = err.message;
+      return;
+    }
+    hint.textContent = "Thanks — this is shared with the program coordinator.";
+    renderChatReviewWidget(chat);
+  });
+}
+
 async function renderChatList() {
   const chats = await getMyChats();
   const list = document.getElementById("chat-list");
@@ -973,6 +1097,8 @@ async function openChat(chatId) {
   subjectEl.style.color = accentColor;
   document.getElementById("chat-thread-head").style.setProperty("--accent-color", accentColor);
   renderBookingWidget(chat);
+  renderChatLogWidget(chat);
+  renderChatReviewWidget(chat);
 
   markChatRead(me.email, chatId);
   renderChatList();
@@ -1154,7 +1280,7 @@ async function startChatWith(tutorEmail) {
 
 // `user`/`profile` are always a tutor's — this modal only opens from a
 // tutee's Matching tab.
-function openCandidateProfileModal(user, profile) {
+async function openCandidateProfileModal(user, profile) {
   document.getElementById("candidate-profile-name").textContent = user.name;
   document.getElementById("candidate-profile-subtitle").textContent = candidateSubtitle(profile);
   document.getElementById("candidate-profile-bio").textContent = profile.bio || "No bio yet.";
@@ -1181,9 +1307,13 @@ function openCandidateProfileModal(user, profile) {
     videoEl.style.display = "none";
   }
 
+  const stats = await getTutorStats(user.email);
   const extraRows = [];
   if (profile.rate) extraRows.push(["Rate", profile.rate]);
-  if (profile.tutoringHours) extraRows.push(["Tutoring Hours", `${profile.tutoringHours} hrs`]);
+  if (profile.tutoringHours) extraRows.push(["Tutoring Hours (self-reported)", `${profile.tutoringHours} hrs`]);
+  if (stats.sessions) extraRows.push(["Sessions Tutored", String(stats.sessions)]);
+  if (stats.hours) extraRows.push(["Hours Tutored", `${stats.hours} hrs`]);
+  if (stats.ratingCount) extraRows.push(["Rating", `${stats.averageRating} / 5 (${stats.ratingCount} rating${stats.ratingCount === 1 ? "" : "s"})`]);
 
   const extraSection = document.getElementById("candidate-profile-extra-section");
   if (extraRows.length) {
@@ -1212,37 +1342,34 @@ function openCandidateProfileModal(user, profile) {
     startChatWith(user.email);
   };
 
-  // Feedback: tutees can leave (and see) comments about a tutor.
-  renderCandidateComments(user.email);
-  document.getElementById("candidate-comment-hint").textContent = "";
-  document.getElementById("candidate-comment-form").onsubmit = async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("candidate-comment-input");
-    const text = input.value.trim();
-    if (!text) return;
-    await addComment(user.email, text);
-    input.value = "";
-    document.getElementById("candidate-comment-hint").textContent = "Thanks — this is shared with the program coordinator.";
-    renderCandidateComments(user.email);
-  };
+  // Reviews are read-only here — a tutee writes one from the chat, once
+  // they've logged a session with this tutor (see renderChatReviewWidget).
+  renderCandidateReviewsDropdown(user.email, stats);
 
   toggleModal("candidate-profile-modal", true);
 }
 
-async function renderCandidateComments(tutorEmail) {
+async function renderCandidateReviewsDropdown(tutorEmail, stats) {
+  document.getElementById("candidate-profile-reviews-summary").innerHTML = stats.ratingCount
+    ? `Reviews ${starRatingHtml(stats.averageRating)} <span class="reviews-count">${stats.averageRating} (${stats.ratingCount} rating${
+        stats.ratingCount === 1 ? "" : "s"
+      })</span>`
+    : `Reviews <span class="reviews-count">No ratings yet</span>`;
+
   const comments = await getVisibleCommentsForTutor(tutorEmail);
   document.getElementById("candidate-profile-comments-list").innerHTML = comments.length
     ? comments
         .map(
           (c) => `
       <div class="tutor-comment-row">
+        ${c.rating != null ? starRatingHtml(c.rating) : ""}
         <span class="tutor-comment-author">${escapeHtml(c.authorName || c.authorEmail)}</span>
         <span class="tutor-comment-date">${formatDateTime(c.createdAt)}</span>
         <p class="tutor-comment-text">${escapeHtml(c.text)}</p>
       </div>`
         )
         .join("")
-    : `<p class="chat-list-empty">No feedback yet — be the first!</p>`;
+    : `<p class="chat-list-empty">No reviews yet — be the first once you've had a session!</p>`;
 }
 
 async function renderMatchingList() {
@@ -1594,4 +1721,58 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ---------------- Star ratings (0-5, 0.5 steps) ----------------
+// Each star is a background outline SVG plus a color-filled SVG clipped to
+// a --fill percentage (0/50/100), so a fractional star reads as half-lit.
+
+const STAR_PATH = "M12 .587l3.668 7.431L24 9.75l-6 5.847L19.335 24 12 19.897 4.665 24 6 15.597 0 9.75l8.332-1.732z";
+
+function starHtml(fillPercent, hit) {
+  return `
+    <span class="star" style="--fill:${fillPercent}%">
+      <svg class="star-bg" viewBox="0 0 24 24" fill="currentColor"><path d="${STAR_PATH}"/></svg>
+      <span class="star-fill-wrap"><svg viewBox="0 0 24 24" fill="currentColor"><path d="${STAR_PATH}"/></svg></span>
+      ${hit || ""}
+    </span>`;
+}
+
+// Read-only display of a rating, e.g. in a review list or a summary line.
+function starRatingHtml(value) {
+  const v = Math.max(0, Math.min(5, value || 0));
+  const stars = [0, 1, 2, 3, 4].map((i) => starHtml(Math.max(0, Math.min(1, v - i)) * 100)).join("");
+  return `<span class="star-rating">${stars}</span>`;
+}
+
+// Interactive picker: each star is two half-width click targets (left =
+// x.5, right = x+1), wired up by wireStarRatingPicker below.
+function starRatingPickerHtml(value) {
+  const v = value || 0;
+  const stars = [0, 1, 2, 3, 4]
+    .map((i) => {
+      const fill = Math.max(0, Math.min(1, v - i)) * 100;
+      const hit = `
+        <span class="star-hit-half star-hit-left" data-value="${i + 0.5}"></span>
+        <span class="star-hit-half star-hit-right" data-value="${i + 1}"></span>`;
+      return starHtml(fill, hit);
+    })
+    .join("");
+  return `<span class="star-rating star-rating-input">${stars}</span>`;
+}
+
+// Wires click handlers onto a star-rating-input's half-star hit targets;
+// onChange(value) fires with the picked value and the display updates to
+// match immediately (no server round-trip needed just to preview).
+function wireStarRatingPicker(pickerEl, onChange) {
+  const stars = pickerEl.querySelectorAll(".star");
+  pickerEl.querySelectorAll(".star-hit-half").forEach((hit) => {
+    hit.addEventListener("click", () => {
+      const value = parseFloat(hit.dataset.value);
+      stars.forEach((starEl, i) => {
+        starEl.style.setProperty("--fill", `${Math.max(0, Math.min(1, value - i)) * 100}%`);
+      });
+      onChange(value);
+    });
+  });
 }
