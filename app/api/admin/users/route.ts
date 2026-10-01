@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin";
 
 export async function GET(req: NextRequest) {
   const admin = await requireAdmin(req);
-  if (!admin) return NextResponse.json({ error: "Not an admin." }, { status: 403 });
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase

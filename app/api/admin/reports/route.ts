@@ -24,7 +24,7 @@ function reportRowToJson(row: Record<string, unknown>, names: Map<string, string
 
 export async function GET(req: NextRequest) {
   const admin = await requireAdmin(req);
-  if (!admin) return NextResponse.json({ error: "Not an admin." }, { status: 403 });
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from("reports").select("*").order("created_at", { ascending: false });

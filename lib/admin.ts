@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
-import { resolveAuthToken } from "@/lib/auth";
+import { ADMIN_IDENTITY, hasAdminSession } from "@/lib/adminSession";
 
+// Still used by signup to let allowlisted staff emails register from outside
+// the school domain. It no longer grants admin access by itself.
 export function getAdminEmails(): string[] {
   return (process.env.ADMIN_EMAILS || "")
     .split(",")
@@ -8,11 +10,9 @@ export function getAdminEmails(): string[] {
     .filter(Boolean);
 }
 
-// Admin access is deliberately not a role or a DB flag — just an email
-// allowlist checked against the same bearer token every other route uses.
-// Adding/removing a staff member is an env var change, not a migration.
+// Admin access = a valid session from the shared password-only /admin login
+// (lib/adminSession.ts). Returns the identity to record for staff actions
+// (a fixed "admin"), or null when not signed in.
 export async function requireAdmin(req: NextRequest): Promise<string | null> {
-  const email = await resolveAuthToken(req);
-  if (!email) return null;
-  return getAdminEmails().includes(email.toLowerCase()) ? email : null;
+  return hasAdminSession(req) ? ADMIN_IDENTITY : null;
 }

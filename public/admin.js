@@ -1,15 +1,26 @@
-const me = requireSession("/login");
-
-if (me) {
-  init();
+// Staff tools for /admin/staff. Access is the shared password-only admin
+// session (an httpOnly cookie sent automatically on same-origin requests),
+// not the student app's per-tab bearer-token login.
+async function adminFetchJson(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+  const res = await fetch(path, { ...options, headers, credentials: "same-origin" });
+  if (res.status === 401) {
+    window.location.href = "/admin/login";
+    throw new Error("Session expired.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Something went wrong.");
+  return data;
 }
 
-async function init() {
-  document.getElementById("admin-email").textContent = me.email;
+init();
 
+async function init() {
   let isAdmin = true;
   try {
-    await authFetchJson("/api/admin/me");
+    const me = await adminFetchJson("/api/admin/me");
+    document.getElementById("admin-email").textContent = me.email || "";
   } catch (err) {
     isAdmin = false;
   }
@@ -39,7 +50,7 @@ async function renderReports() {
   const list = document.getElementById("admin-reports-list");
   let reports;
   try {
-    reports = await authFetchJson("/api/admin/reports");
+    reports = await adminFetchJson("/api/admin/reports");
   } catch (err) {
     list.innerHTML = `<p class="admin-empty">Could not load reports: ${escapeHtml(err.message)}</p>`;
     return;
@@ -80,7 +91,7 @@ async function renderReports() {
     btn.addEventListener("click", async () => {
       btn.disabled = true;
       try {
-        await authFetchJson(`/api/admin/reports/${btn.dataset.id}`, { method: "PATCH" });
+        await adminFetchJson(`/api/admin/reports/${btn.dataset.id}`, { method: "PATCH" });
         renderReports();
       } catch (err) {
         alert(err.message);
@@ -94,7 +105,7 @@ async function renderUsers() {
   const list = document.getElementById("admin-users-list");
   let users;
   try {
-    users = await authFetchJson("/api/admin/users");
+    users = await adminFetchJson("/api/admin/users");
   } catch (err) {
     list.innerHTML = `<p class="admin-empty">Could not load users: ${escapeHtml(err.message)}</p>`;
     return;
@@ -122,7 +133,7 @@ async function renderUsers() {
       if (nextDisabled && !confirm(`Disable ${btn.dataset.email}? They won't be able to log in.`)) return;
       btn.disabled = true;
       try {
-        await authFetchJson(`/api/admin/users/${encodeURIComponent(btn.dataset.email)}`, {
+        await adminFetchJson(`/api/admin/users/${encodeURIComponent(btn.dataset.email)}`, {
           method: "PATCH",
           body: JSON.stringify({ disabled: nextDisabled }),
         });

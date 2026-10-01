@@ -1,0 +1,212 @@
+/* Styles for the /admin data pages, ported from the former mulls-monster
+   Data Admin (app/globals.css) and scoped under .mm-admin so they never
+   affect the student-facing peer-tutoring pages. */
+
+.mm-admin {
+   --bg: #0f1420;
+   --panel: #171e2e;
+   --panel-2: #1e2739;
+   --border: #2a3448;
+   --text: #e6ebf5;
+   --muted: #93a0b8;
+   
+   --vcs-navy: #003360;
+   --vcs-navy-dark: #00203d;
+   --vcs-sky: #8cd2f4;
+   --accent: #4f8cff;
+   --accent-soft: #1b2c4d;
+   --ok: #3ecf8e;
+   --info: #4f8cff;
+   --warn: #f5a623;
+   --danger: #ff5d5d;
+   --radius: 12px;
+   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.mm-admin, .mm-admin * { box-sizing: border-box;
+}
+.mm-admin {
+   margin: 0;
+   padding: 0;
+   background: var(--bg);
+   color: var(--text);
+   font-family: var(--sans);
+   font-size: 15px;
+   line-height: 1.5;
+   -webkit-font-smoothing: antialiased;
+}
+.mm-admin a { color: var(--accent); text-decoration: none;
+}
+.mm-admin a:hover { text-decoration: underline;
+}
+.mm-admin .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px;
+}
+.mm-admin .topbar {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   padding: 14px 20px;
+   border-bottom: 1px solid var(--border);
+   background: var(--panel);
+   position: sticky;
+   top: 0;
+   z-index: 10;
+}
+.mm-admin .topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 600;
+}
+.mm-admin .topbar .brand .logo {
+   height: 26px; width: auto; display: block;
+}
+.mm-admin .topbar .right { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 13px;
+}
+.mm-admin main { padding: 28px 0 60px;
+}
+.mm-admin h1 { font-size: 22px; margin: 0 0 4px;
+}
+.mm-admin h2 { font-size: 16px; margin: 0 0 12px; color: var(--text);
+}
+.mm-admin .muted { color: var(--muted);
+}
+.mm-admin .sub { color: var(--muted); margin: 0 0 24px;
+}
+.mm-admin .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;
+}
+.mm-admin .card {
+   background: var(--panel);
+   border: 1px solid var(--border);
+   border-radius: var(--radius);
+   padding: 18px;
+   transition: border-color .15s, transform .15s;
+}
+.mm-admin .card:hover { border-color: var(--accent);
+}
+.mm-admin .card .title { font-weight: 600; font-size: 16px;
+}
+.mm-admin .card .desc { color: var(--muted); font-size: 13px; margin: 6px 0 14px;
+}
+.mm-admin .card .meta { display: flex; gap: 8px; flex-wrap: wrap;
+}
+.mm-admin .pill {
+   display: inline-flex; align-items: center; gap: 6px;
+   background: var(--panel-2); border: 1px solid var(--border);
+   border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--muted);
+}
+.mm-admin .table-wrap {
+   background: var(--panel); border: 1px solid var(--border);
+   border-radius: var(--radius); overflow: hidden;
+}
+.mm-admin table { width: 100%; border-collapse: collapse; font-size: 14px;
+}
+.mm-admin thead th {
+   text-align: left; padding: 11px 14px; background: var(--panel-2);
+   border-bottom: 1px solid var(--border); color: var(--muted);
+   font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em;
+   white-space: nowrap; cursor: pointer; user-select: none;
+}
+.mm-admin thead th .arrow { opacity: .5; font-size: 10px;
+}
+.mm-admin tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top;
+}
+.mm-admin tbody tr:last-child td { border-bottom: none;
+}
+.mm-admin tbody tr:hover { background: var(--panel-2);
+}
+.mm-admin td.mono { font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+}
+.mm-admin .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
+}
+.mm-admin .badge.ok { background: rgba(62,207,142,.15); color: var(--ok);
+}
+.mm-admin .badge.info { background: rgba(79,140,255,.15); color: var(--info);
+}
+.mm-admin .badge.warn { background: rgba(245,166,35,.15); color: var(--warn);
+}
+.mm-admin .badge.danger { background: rgba(255,93,93,.15); color: var(--danger);
+}
+.mm-admin button, .mm-admin .btn {
+   font-family: inherit; font-size: 13px; cursor: pointer;
+   background: var(--accent-soft); color: var(--text);
+   border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px;
+   transition: background .15s, border-color .15s;
+}
+.mm-admin button:hover, .mm-admin .btn:hover { background: #24395f; border-color: var(--accent);
+}
+.mm-admin button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; font-weight: 600;
+}
+.mm-admin button:disabled { opacity: .5; cursor: not-allowed;
+}
+.mm-admin input, .mm-admin select {
+   font-family: inherit; font-size: 14px; color: var(--text);
+   background: var(--panel-2); border: 1px solid var(--border);
+   border-radius: 8px; padding: 8px 11px;
+}
+.mm-admin input:focus, .mm-admin select:focus { outline: none; border-color: var(--accent);
+}
+.mm-admin .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;
+}
+.mm-admin .toolbar .spacer { flex: 1;
+}
+.mm-admin .toolbar input[type="search"] { min-width: 240px;
+}
+.mm-admin .empty, .mm-admin .error, .mm-admin .loading { padding: 26px; text-align: center; color: var(--muted);
+}
+.mm-admin .error { color: var(--danger);
+}
+.mm-admin .pagination { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-top: 1px solid var(--border);
+}
+.mm-admin .pagination .info { color: var(--muted); font-size: 13px;
+}
+.mm-admin .pagination .pages { display: flex; gap: 6px;
+}
+.mm-admin .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 4px;
+}
+.mm-admin .profile-photo {
+   width: 96px; height: 96px; border-radius: 50%; object-fit: cover;
+   border: 1px solid var(--border); background: var(--panel-2); flex: none;
+}
+.mm-admin .mm-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 20px; align-items: start;
+}
+.mm-admin .field-list { display: grid; grid-template-columns: 130px 1fr; gap: 9px 12px; font-size: 13.5px; margin: 0;
+}
+.mm-admin .field-list dt { color: var(--muted);
+}
+.mm-admin .field-list dd { margin: 0; overflow-wrap: anywhere;
+}
+.mm-admin .profile-video { width: 100%; max-height: 480px; border-radius: 8px; margin-top: 8px; background: #000; display: block;
+}
+.mm-admin .profile-resume { width: 100%; height: 70vh; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; background: #fff; display: block;
+}
+.mm-admin .mini-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px;
+}
+.mm-admin .mini-table th, .mm-admin .mini-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere;
+}
+.mm-admin .mini-table th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .03em;
+}
+.mm-admin .login-wrap {
+   min-height: 100vh; display: grid; place-items: center; padding: 20px;
+   background: linear-gradient(160deg, var(--vcs-navy) 0%, var(--vcs-navy-dark) 100%);
+}
+.mm-admin .login-card {
+   width: 100%; max-width: 360px; background: var(--panel);
+   border: 1px solid var(--border); border-radius: 16px; padding: 30px;
+   box-shadow: 0 20px 60px rgba(0, 51, 96, 0.35);
+}
+.mm-admin .login-logo { height: 34px; width: auto; display: block; margin-bottom: 20px;
+}
+.mm-admin .login-card h1 { font-size: 20px;
+}
+.mm-admin .login-card form { display: flex; flex-direction: column; gap: 12px; margin-top: 18px;
+}
+.mm-admin .login-card .err { color: var(--danger); font-size: 13px; min-height: 16px;
+}
+.mm-admin .login-card button.primary { background: var(--vcs-sky); border-color: var(--vcs-sky); color: var(--vcs-navy-dark); font-weight: 700;
+}
+.mm-admin .login-card button.primary:hover:not(:disabled) { background: #a7ddf7;
+}
+.mm-admin .footer { margin-top: 40px; color: var(--muted); font-size: 12px; text-align: center;
+}
+.mm-admin .linkbtn { background: none; border: none; color: var(--accent); padding: 0; text-decoration: underline; cursor: pointer; font-size: 13px;
+}
+
+.mm-admin { min-height: 100vh; }
+.mm-admin .home-section { margin-top: 28px; }

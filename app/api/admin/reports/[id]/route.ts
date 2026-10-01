@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin(req);
-  if (!admin) return NextResponse.json({ error: "Not an admin." }, { status: 403 });
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
   const supabase = getSupabaseAdmin();
