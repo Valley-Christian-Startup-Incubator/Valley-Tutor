@@ -619,6 +619,22 @@
   margin-bottom: 18px;
 }
 
+.other-subject-row {
+  margin: 4px 0 20px;
+}
+
+.other-subject-row label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  margin-bottom: 8px;
+}
+
+.other-subject-row .course-search-row {
+  margin-bottom: 6px;
+}
+
 .course-search-row input {
   flex: 1;
   font-family: var(--font-sans);

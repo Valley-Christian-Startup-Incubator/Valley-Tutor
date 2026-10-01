@@ -178,6 +178,17 @@ export default function AppPage() {
 
                 <div className="course-categories" id="course-categories"></div>
 
+                <div className="other-subject-row" id="other-subject-row" style={{ display: "none" }}>
+                  <label htmlFor="other-subject-input">Don&apos;t see your topic? Request it</label>
+                  <div className="course-search-row">
+                    <input type="text" id="other-subject-input" autoComplete="off" maxLength={60} placeholder="e.g. Robotics, AP Research, Music Theory" />
+                    <button type="button" className="btn-ghost" id="other-subject-add-btn">Add</button>
+                  </div>
+                  <p className="field-hint" id="other-subject-hint">
+                    We can&apos;t guarantee a tutor is available yet — this adds it to your list and lets the coordinators know so they can try to find someone.
+                  </p>
+                </div>
+
                 <div className="qualified-panel" id="qualified-panel" style={{ display: "none" }}>
                   <button type="button" className="qualified-toggle" id="qualified-toggle">
                     <span className="qualified-toggle-text">

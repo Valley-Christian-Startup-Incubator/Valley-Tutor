@@ -599,6 +599,30 @@ async function initSubjectsTab() {
       .join("");
   }
 
+  // "Other" — a tutee can request a topic that isn't in the catalog. It's
+  // added to their subjects as plain text (same as any catalog pick), and
+  // we also ping staff so a coordinator can try to find/recruit a tutor for
+  // it, since no tutor will auto-match on a one-off custom string.
+  const otherRow = document.getElementById("other-subject-row");
+  otherRow.style.display = isTutor ? "none" : "block";
+  if (!isTutor) {
+    document.getElementById("other-subject-add-btn").addEventListener("click", () => {
+      const input = document.getElementById("other-subject-input");
+      const hint = document.getElementById("other-subject-hint");
+      const topic = input.value.trim();
+      if (!topic) return;
+      if (pendingSubjects.has(topic)) {
+        hint.textContent = "That's already on your list.";
+        return;
+      }
+      pendingSubjects.add(topic);
+      renderCourseBrowser();
+      input.value = "";
+      hint.textContent = `Added "${topic}" — don't forget to save, and the coordinators have been notified.`;
+      requestSubjectTopic(topic).catch(() => {});
+    });
+  }
+
   document.getElementById("course-search-input").addEventListener("input", (e) => {
     courseSearchQuery = e.target.value;
     renderCategoryList();

@@ -495,6 +495,15 @@ async function getTutorStats(tutorEmail) {
   return authFetchJson(`/api/tutors/${encodeURIComponent(tutorEmail)}/stats`);
 }
 
+// ---------- Subject requests ----------
+// A tutee's custom "Other" topic (see the Subjects tab) — best-effort email
+// nudge to staff; the topic itself is saved as plain text in their own
+// profile.subjects by the normal profile save, not stored separately here.
+
+async function requestSubjectTopic(topic) {
+  await authFetchJson("/api/subject-requests", { method: "POST", body: JSON.stringify({ topic }) });
+}
+
 // ---------- Comments/reviews (tutee feedback + star rating on tutors) ----------
 // Not real moderation — there's no human reviewer here, just a keyword
 // heuristic standing in for one (see lib/comments.ts, now server-side).
