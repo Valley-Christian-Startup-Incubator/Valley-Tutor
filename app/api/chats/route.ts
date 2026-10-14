@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveAuthToken } from "@/lib/auth";
 import { chatRowToJson, namesForEmails } from "@/lib/chats";
+import { sendEmail } from "@/lib/email";
+
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
 
 export async function GET(req: NextRequest) {
   const email = await resolveAuthToken(req);
@@ -57,5 +62,23 @@ export async function POST(req: NextRequest) {
     console.error("Chat creation failed", error);
     return NextResponse.json({ error: "Could not start the chat." }, { status: 500 });
   }
+
+  // Best-effort "you've matched" email to both sides — fire-and-forget,
+  // same pattern as the report/reset-password emails (lib/email.ts).
+  const origin = req.headers.get("origin") || new URL(req.url).origin;
+  const tutorName = names.get(tutorEmail) || tutorEmail;
+  const tuteeName = names.get(email) || email;
+  const subjectLine = subject ? ` for <strong>${escapeHtml(subject)}</strong>` : "";
+  sendEmail({
+    to: [tutorEmail],
+    subject: `${tuteeName} matched with you on Valley Tutor`,
+    html: `<p><strong>${escapeHtml(tuteeName)}</strong> just started a chat with you${subjectLine}.</p><p><a href="${origin}/app?tab=chats">Say hello</a></p>`,
+  });
+  sendEmail({
+    to: [email],
+    subject: `You matched with ${tutorName} on Valley Tutor`,
+    html: `<p>You're now matched with <strong>${escapeHtml(tutorName)}</strong>${subjectLine}.</p><p><a href="${origin}/app?tab=chats">Start chatting</a></p>`,
+  });
+
   return NextResponse.json(chatRowToJson(created, names));
 }
