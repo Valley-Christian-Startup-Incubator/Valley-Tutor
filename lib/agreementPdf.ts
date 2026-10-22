@@ -60,8 +60,14 @@ export type FillAgreementInput = {
   guardianName: string;
   /** ISO date string, e.g. "2026-08-26" */
   signedDate: string;
-  /** data URL from a <canvas>.toDataURL("image/png") */
-  studentSignaturePng: string;
+  /**
+   * data URL from a <canvas>.toDataURL("image/png"). Optional for a
+   * parent's own signed copy (app/api/agreements, role: "parent") — a
+   * parent signing through their own account only fills the guardian
+   * block; the student's name still prints for reference, but their
+   * signature lives on the student's own separately-signed copy.
+   */
+  studentSignaturePng?: string;
   guardianSignaturePng: string;
 };
 
@@ -104,8 +110,10 @@ export async function fillAgreementPdf(input: FillAgreementInput): Promise<Uint8
   drawLine(dateText, layout.guardianDateLine);
 
   drawLine(input.studentName, layout.studentPrintedLine);
-  await drawSignature(input.studentSignaturePng, layout.studentSigLine);
-  drawLine(dateText, layout.studentDateLine);
+  if (input.studentSignaturePng) {
+    await drawSignature(input.studentSignaturePng, layout.studentSigLine);
+    drawLine(dateText, layout.studentDateLine);
+  }
 
   return pdfDoc.save();
 }

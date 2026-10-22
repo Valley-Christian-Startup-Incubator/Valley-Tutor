@@ -33,21 +33,25 @@ export async function POST(req: NextRequest) {
   if (typeof email !== "string" || !email.includes("@")) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
-  const ALLOWED_DOMAINS = ["@warriorlife.net", "@vcs.net"];
+  if (role !== "tutor" && role !== "tutee" && role !== "parent") {
+    return NextResponse.json({ error: "Role must be 'tutor', 'tutee', or 'parent'." }, { status: 400 });
+  }
   const normalizedForDomainCheck = email.trim().toLowerCase();
-  const isAllowedDomain = ALLOWED_DOMAINS.some((domain) => normalizedForDomainCheck.endsWith(domain));
-  const isAllowlistedAdmin = getAdminEmails().includes(normalizedForDomainCheck);
-  if (!isAllowedDomain && !isAllowlistedAdmin) {
-    return NextResponse.json(
-      { error: "Use your @warriorlife.net or @vcs.net school email to sign up." },
-      { status: 400 }
-    );
+  // Parents aren't students, so the school-domain restriction doesn't apply
+  // to them — any email works.
+  if (role !== "parent") {
+    const ALLOWED_DOMAINS = ["@warriorlife.net", "@vcs.net"];
+    const isAllowedDomain = ALLOWED_DOMAINS.some((domain) => normalizedForDomainCheck.endsWith(domain));
+    const isAllowlistedAdmin = getAdminEmails().includes(normalizedForDomainCheck);
+    if (!isAllowedDomain && !isAllowlistedAdmin) {
+      return NextResponse.json(
+        { error: "Use your @warriorlife.net or @vcs.net school email to sign up." },
+        { status: 400 }
+      );
+    }
   }
   if (typeof password !== "string" || password.length < 8) {
     return NextResponse.json({ error: "Use at least 8 characters." }, { status: 400 });
-  }
-  if (role !== "tutor" && role !== "tutee") {
-    return NextResponse.json({ error: "Role must be 'tutor' or 'tutee'." }, { status: 400 });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -70,12 +74,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not create your account." }, { status: 500 });
   }
 
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .insert({ email: normalizedEmail, ...EMPTY_PROFILE_DEFAULTS });
-  if (profileError) {
-    console.error("Profile row creation failed", profileError);
-    return NextResponse.json({ error: "Could not set up your profile." }, { status: 500 });
+  // Parents don't tutor or get tutored — no subjects/availability/etc. to
+  // track, so they skip the profiles row entirely.
+  if (role !== "parent") {
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .insert({ email: normalizedEmail, ...EMPTY_PROFILE_DEFAULTS });
+    if (profileError) {
+      console.error("Profile row creation failed", profileError);
+      return NextResponse.json({ error: "Could not set up your profile." }, { status: 500 });
+    }
   }
 
   const token = await issueAuthToken(normalizedEmail);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveAuthToken } from "@/lib/auth";
-import { getChatIfParticipant, namesForEmails } from "@/lib/chats";
+import { getChatIfParticipantOrLinkedParent, getLinkedParentEmails, namesForEmails } from "@/lib/chats";
 import { messageRowToJson } from "@/lib/messages";
 import { sendEmail } from "@/lib/email";
 
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ chat
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { chatId } = await params;
-  if (!(await getChatIfParticipant(chatId, email))) {
+  if (!(await getChatIfParticipantOrLinkedParent(chatId, email))) {
     return NextResponse.json({ error: "Not a participant of this chat." }, { status: 403 });
   }
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { chatId } = await params;
-  const chat = await getChatIfParticipant(chatId, email);
+  const chat = await getChatIfParticipantOrLinkedParent(chatId, email);
   if (!chat) {
     return NextResponse.json({ error: "Not a participant of this chat." }, { status: 403 });
   }
@@ -109,18 +109,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
         .limit(1);
       if (recent && recent.length > 0) return;
 
-      const recipientEmail = chat.tutor_email === email ? chat.tutee_email : chat.tutor_email;
-      const names = await namesForEmails([email, recipientEmail]);
+      // Recipients: the chat's other direct party (or both, if a linked
+      // parent sent this), plus every linked parent of the tutee except
+      // whoever just sent the message — parents are "in every chat" their
+      // kid is in, so they get the same nudge the tutor/tutee would.
+      const recipients = new Set<string>();
+      if (email === chat.tutor_email) recipients.add(chat.tutee_email);
+      else if (email === chat.tutee_email) recipients.add(chat.tutor_email);
+      else {
+        recipients.add(chat.tutor_email);
+        recipients.add(chat.tutee_email);
+      }
+      (await getLinkedParentEmails(chat.tutee_email)).forEach((p) => recipients.add(p));
+      recipients.delete(email);
+
+      const names = await namesForEmails([email, ...recipients]);
       const senderName = names.get(email) || email;
       const origin = req.headers.get("origin") || new URL(req.url).origin;
       const preview = data.attachment ? `📎 ${(data.attachment as { name?: string }).name || "Attachment"}` : String(data.text || "");
-      sendEmail({
-        to: [recipientEmail],
-        subject: `${senderName} sent you a message on Valley Tutor`,
-        html: `
-          <p><strong>${escapeHtml(senderName)}</strong> sent you a new message${chat.subject ? ` about <strong>${escapeHtml(chat.subject)}</strong>` : ""}:</p>
-          <p style="margin:12px 0;padding:10px 14px;background:#f4f5f6;border-radius:8px;">${escapeHtml(preview)}</p>
-          <p><a href="${origin}/app?tab=chats">Reply on Valley Tutor</a></p>`,
+      recipients.forEach((recipientEmail) => {
+        sendEmail({
+          to: [recipientEmail],
+          subject: `${senderName} sent you a message on Valley Tutor`,
+          html: `
+            <p><strong>${escapeHtml(senderName)}</strong> sent a new message${chat.subject ? ` about <strong>${escapeHtml(chat.subject)}</strong>` : ""}:</p>
+            <p style="margin:12px 0;padding:10px 14px;background:#f4f5f6;border-radius:8px;">${escapeHtml(preview)}</p>
+            <p><a href="${origin}/app?tab=chats">Reply on Valley Tutor</a></p>`,
+        });
       });
     })();
   }

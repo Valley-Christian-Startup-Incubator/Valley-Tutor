@@ -70,6 +70,28 @@ document.querySelectorAll('input[name="role"]').forEach((input) => {
 });
 updateSignupVideoField();
 
+// Parents aren't students, so the email field's school-domain copy doesn't
+// apply to them — swap the label/hint/placeholder when that role is picked.
+const signupEmailLabel = document.querySelector('label[for="signup-email"]');
+const signupEmailInput = document.getElementById("signup-email");
+const signupEmailHint = document.querySelector("#field-signup-email .field-hint");
+function updateSignupEmailField() {
+  const role = document.querySelector('input[name="role"]:checked').value;
+  if (role === "parent") {
+    signupEmailLabel.textContent = "Email";
+    signupEmailInput.placeholder = "you@example.com";
+    signupEmailHint.textContent = "Any email works — this doesn't need to be a school address.";
+  } else {
+    signupEmailLabel.textContent = "School email";
+    signupEmailInput.placeholder = "you@warriorlife.net";
+    signupEmailHint.textContent = "Use your Valley Christian school email.";
+  }
+}
+document.querySelectorAll('input[name="role"]').forEach((input) => {
+  input.addEventListener("change", updateSignupEmailField);
+});
+updateSignupEmailField();
+
 document.getElementById("signup-name").addEventListener("input", (e) => {
   const initialsEl = document.getElementById("signup-avatar-preview-initials");
   initialsEl.textContent = e.target.value.trim() ? initials(e.target.value.trim()) : "?";
@@ -206,7 +228,7 @@ formLogin.addEventListener("submit", async (e) => {
   startSession(data.token, data.user);
   showSuccess(`Welcome back, ${data.user.name.split(" ")[0]}! Taking you to your dashboard…`);
   setTimeout(() => {
-    window.location.href = "/app";
+    window.location.href = data.user.role === "parent" ? "/parent" : "/app";
   }, 700);
 });
 
@@ -269,7 +291,10 @@ formSignup.addEventListener("submit", async (e) => {
 
   startSession(data.token, data.user);
 
-  if (signupPendingPhoto || signupPendingVideo) {
+  // Parents have no profiles row (no subjects/photo/etc. to track) and
+  // don't sign a standalone agreement for themselves — their signature is
+  // per linked child, done from the parent dashboard (see public/parent.js).
+  if (role !== "parent" && (signupPendingPhoto || signupPendingVideo)) {
     const profile = await getMyProfile();
     profile.photo = signupPendingPhoto;
     if (role === "tutor") profile.introVideo = signupPendingVideo;
@@ -278,13 +303,14 @@ formSignup.addEventListener("submit", async (e) => {
 
   showSuccess(`Account created! Welcome to Peer Tutoring, ${name.split(" ")[0]}.`);
   setTimeout(() => {
-    window.location.href = "/sign-agreement";
+    window.location.href = role === "parent" ? "/parent" : "/sign-agreement";
   }, 700);
 });
 
 (function redirectIfLoggedIn() {
-  if (getSession()) {
-    window.location.href = "/app";
+  const session = getSession();
+  if (session) {
+    window.location.href = session.role === "parent" ? "/parent" : "/app";
   }
 })();
 

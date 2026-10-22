@@ -619,6 +619,17 @@
   margin-bottom: 18px;
 }
 
+.invite-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--navy-dark);
+  background: var(--gray-light);
+  padding: 8px 14px;
+  border-radius: 8px;
+}
+
 .other-subject-row {
   margin: 4px 0 20px;
 }
@@ -1834,6 +1845,14 @@
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.msg-sender {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  color: var(--navy);
 }
 
 .msg-time {

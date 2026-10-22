@@ -38,6 +38,15 @@ export default function AccountPage() {
                 </div>
               </div>
 
+              <div className="profile-card" id="invite-code-card" style={{ display: "none" }}>
+                <h2>Invite a Parent</h2>
+                <p className="profile-lead">Share this code with a parent/guardian so they can link to your account.</p>
+                <div className="row-between">
+                  <span className="invite-code" id="invite-code-display"></span>
+                  <button type="button" className="btn-ghost" id="invite-code-regenerate-btn">Regenerate</button>
+                </div>
+              </div>
+
               <div className="profile-card">
                 <h2>Change Password</h2>
                 <div className="alert alert-error" id="password-alert-error" role="alert"></div>

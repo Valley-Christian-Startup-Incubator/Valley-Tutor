@@ -16,6 +16,37 @@ export async function getChatIfParticipant(chatId: string, email: string) {
   return chat;
 }
 
+export async function isLinkedParentOf(parentEmail: string, studentEmail: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from("parent_links")
+    .select("id")
+    .eq("parent_email", parentEmail)
+    .eq("student_email", studentEmail)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+export async function getLinkedParentEmails(studentEmail: string): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase.from("parent_links").select("parent_email").eq("student_email", studentEmail);
+  return (data || []).map((r) => r.parent_email as string);
+}
+
+// Same as getChatIfParticipant, but also allows a caller who's a linked
+// parent of the tutee — used only where a parent should actually reach the
+// chat (viewing/posting messages), not the booking-mutation routes.
+export async function getChatIfParticipantOrLinkedParent(chatId: string, email: string) {
+  const chat = await getChatIfParticipant(chatId, email);
+  if (chat) return chat;
+
+  const supabase = getSupabaseAdmin();
+  const { data: chatRow } = await supabase.from("chats").select("*").eq("id", chatId).maybeSingle();
+  if (!chatRow) return null;
+  if (await isLinkedParentOf(email, chatRow.tutee_email)) return chatRow;
+  return null;
+}
+
 export function chatRowToJson(row: Record<string, unknown>, names?: Map<string, string>) {
   return {
     id: row.id,

@@ -6,6 +6,23 @@ const me = requireSession("/login");
   document.getElementById("account-email").value = me.email;
   document.getElementById("account-role-pill").textContent = me.role;
 
+  if (me.role === "tutee") {
+    const card = document.getElementById("invite-code-card");
+    card.style.display = "block";
+    const display = document.getElementById("invite-code-display");
+    async function loadInviteCode() {
+      display.textContent = "…";
+      const { code } = await authFetchJson("/api/profiles/me/invite-code");
+      display.textContent = code;
+    }
+    document.getElementById("invite-code-regenerate-btn").addEventListener("click", async () => {
+      if (!confirm("Regenerate your invite code? The old one will stop working.")) return;
+      const { code } = await authFetchJson("/api/profiles/me/invite-code", { method: "POST" });
+      display.textContent = code;
+    });
+    loadInviteCode();
+  }
+
   const otherRole = me.role === "tutor" ? "tutee" : "tutor";
   const switchBtn = document.getElementById("account-switch-role-btn");
   switchBtn.textContent = `Switch to ${otherRole}`;

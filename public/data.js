@@ -349,6 +349,24 @@ async function getAllTutors() {
   return authFetchJson("/api/tutors");
 }
 
+// ---------- Parent accounts ----------
+
+async function getParentLinks() {
+  return authFetchJson("/api/parent-links");
+}
+
+async function linkParentToStudent(code) {
+  return authFetchJson("/api/parent-links", { method: "POST", body: JSON.stringify({ code }) });
+}
+
+async function getChildChats(studentEmail) {
+  return authFetchJson(`/api/parent/children/${encodeURIComponent(studentEmail)}/chats`);
+}
+
+async function getChildSessions(studentEmail) {
+  return authFetchJson(`/api/parent/children/${encodeURIComponent(studentEmail)}/sessions`);
+}
+
 // ---------- Chats ----------
 
 async function getMyChats() {

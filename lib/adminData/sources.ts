@@ -92,15 +92,16 @@ export const BUILTIN_SOURCES: SourceDef[] = [
            primary: "id",
            columns: [
                 { key: "user_email", label: "Email", kind: "email", searchable: true },
-                { key: "role", label: "Role", kind: "badge", badge: { tutor: "ok", tutee: "info" }, searchable: true },
+                { key: "role", label: "Role", kind: "badge", badge: { tutor: "ok", tutee: "info", parent: "warn" }, searchable: true },
                 { key: "student_name", label: "Student", kind: "text", searchable: true },
+                { key: "student_email", label: "Student Email (parent rows)", kind: "email", searchable: true },
                 { key: "guardian_name", label: "Guardian", kind: "text", searchable: true },
                 { key: "signed_date", label: "Date Signed", kind: "date" },
                 { key: "document_version", label: "Document", kind: "text" },
                 { key: "signed_at", label: "Recorded At", kind: "datetime" },
                 { key: "pdf_storage_path", label: "Signed PDF", kind: "pdf", bucket: "signed-agreements" },
              ],
-           filters: [{ key: "role", label: "Role", options: ["tutor", "tutee"] }],
+           filters: [{ key: "role", label: "Role", options: ["tutor", "tutee", "parent"] }],
           },
           {
            id: "rate_agreements",
@@ -135,12 +136,12 @@ export const BUILTIN_SOURCES: SourceDef[] = [
            columns: [
                 { key: "name", label: "Name", kind: "profile", profileKey: "email", searchable: true },
                 { key: "email", label: "Email", kind: "profile", searchable: true },
-                { key: "role", label: "Role", kind: "badge", badge: { tutor: "ok", tutee: "info" }, searchable: true },
+                { key: "role", label: "Role", kind: "badge", badge: { tutor: "ok", tutee: "info", parent: "warn" }, searchable: true },
                 { key: "grade_level", label: "Grade", kind: "text", searchable: false },
                 { key: "class_year", label: "Class Year", kind: "text", searchable: false },
                 { key: "subjects", label: "Classes Tutoring", kind: "text", searchable: false },
              ],
-           filters: [{ key: "role", label: "Role", options: ["tutor", "tutee"] }],
+           filters: [{ key: "role", label: "Role", options: ["tutor", "tutee", "parent"] }],
            lookups: [
                 {
                  sourceColumn: "email",
@@ -171,6 +172,23 @@ export const BUILTIN_SOURCES: SourceDef[] = [
            lookups: [
                 { sourceColumn: "tutor_email", table: "users", matchColumn: "email", fields: [{ key: "tutor_name", column: "name" }] },
                 { sourceColumn: "tutee_email", table: "users", matchColumn: "email", fields: [{ key: "tutee_name", column: "name" }] },
+             ],
+          },
+          {
+           id: "parent_links",
+           label: "Parent Links",
+           description: "A parent account linked to a student (tutee) account via the student's invite code.",
+           primary: "created_at",
+           columns: [
+                { key: "parent_name", label: "Parent", kind: "profile", profileKey: "parent_email", searchable: false },
+                { key: "parent_email", label: "Parent Email", kind: "email", searchable: true },
+                { key: "student_name", label: "Student", kind: "profile", profileKey: "student_email", searchable: false },
+                { key: "student_email", label: "Student Email", kind: "email", searchable: true },
+                { key: "created_at", label: "Linked At", kind: "datetime" },
+             ],
+           lookups: [
+                { sourceColumn: "parent_email", table: "users", matchColumn: "email", fields: [{ key: "parent_name", column: "name" }] },
+                { sourceColumn: "student_email", table: "users", matchColumn: "email", fields: [{ key: "student_name", column: "name" }] },
              ],
           },
        ],

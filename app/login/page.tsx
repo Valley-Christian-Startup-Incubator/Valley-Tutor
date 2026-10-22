@@ -117,6 +117,17 @@ export default function LoginPage() {
                     <span className="role-desc">I&apos;m looking for help from a tutor</span>
                   </span>
                 </label>
+                <label className="role-option">
+                  <input type="radio" name="role" value="parent" id="role-parent" />
+                  <span className="role-card">
+                    <svg className="role-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span className="role-title">Parent</span>
+                    <span className="role-desc">I want to link to my child&apos;s account</span>
+                  </span>
+                </label>
               </div>
             </div>
 

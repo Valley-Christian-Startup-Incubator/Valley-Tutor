@@ -52,6 +52,43 @@ export async function POST(req: NextRequest) {
   const names = await namesForEmails([tutorEmail, email]);
   if (existing) return NextResponse.json(chatRowToJson(existing, names));
 
+  // Junior-high tutees (6th-8th) can't be matched until both they and a
+  // linked parent have signed off — the one real server-side gate for the
+  // parent-accounts feature; the existing high-school self-sign flow is
+  // untouched (still a client-side nudge only, see public/app.js).
+  const { data: profile } = await supabase.from("profiles").select("grade_level").eq("email", email).maybeSingle();
+  if (["6th", "7th", "8th"].includes(profile?.grade_level)) {
+    const { data: ownAgreement } = await supabase
+      .from("agreements")
+      .select("id")
+      .eq("user_email", email)
+      .limit(1)
+      .maybeSingle();
+    if (!ownAgreement) {
+      return NextResponse.json({ error: "Sign the program agreement before you can start a chat." }, { status: 403 });
+    }
+
+    const { data: parentLinks } = await supabase.from("parent_links").select("parent_email").eq("student_email", email);
+    const parentEmails = (parentLinks || []).map((l) => l.parent_email);
+    let aParentHasSigned = false;
+    if (parentEmails.length > 0) {
+      const { data: parentAgreements } = await supabase
+        .from("agreements")
+        .select("id")
+        .eq("role", "parent")
+        .eq("student_email", email)
+        .in("user_email", parentEmails)
+        .limit(1);
+      aParentHasSigned = Boolean(parentAgreements && parentAgreements.length > 0);
+    }
+    if (!aParentHasSigned) {
+      return NextResponse.json(
+        { error: "A linked parent needs to sign the program agreement before you can start a chat." },
+        { status: 403 }
+      );
+    }
+  }
+
   const { data: created, error } = await supabase
     .from("chats")
     .insert({ tutor_email: tutorEmail, tutee_email: email, subject })

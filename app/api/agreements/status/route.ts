@@ -6,15 +6,19 @@ export async function GET(req: NextRequest) {
   if (!email) {
     return NextResponse.json({ error: "email is required" }, { status: 400 });
   }
+  // A parent checking whether they've signed for a specific linked child —
+  // a parent can have multiple children, each needing their own signature.
+  const studentEmail = req.nextUrl.searchParams.get("studentEmail");
 
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  let query = supabase
     .from("agreements")
     .select("signed_at")
     .eq("user_email", email.toLowerCase())
     .order("signed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  query = studentEmail ? query.eq("student_email", studentEmail.toLowerCase()) : query;
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     console.error("Failed to check agreement status", error);
